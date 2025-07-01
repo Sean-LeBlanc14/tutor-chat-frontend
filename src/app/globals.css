@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 .HomePage {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -10,16 +11,52 @@
   color: white;
   padding: 1rem;
   font-family: 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+.HomePage.initial {
+  justify-content: center;
+}
+
+.HomePage.has-asked {
+  justify-content: space-between;
 }
 
 .home-title {
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 0.5rem;
+  text-align: center;
 }
 
 .home-description {
   font-size: 1rem;
   margin-bottom: 2rem;
   color: #c5c5d2;
+  text-align: center;
+}
+
+.chat-response {
+  margin-top: 2rem;
+  max-width: 600px;
+  min-height: 4rem;
+  padding: 1rem;
+  background-color: #444654;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.chat-box-wrapper {
+  width: 100%;
+  max-width: 600px;
+  transition: all 0.3 ease;
+}
+
+.chat-box-wrapper.fixed-bottom {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
