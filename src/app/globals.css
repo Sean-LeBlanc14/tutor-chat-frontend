@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
+body, html {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 .HomePage {
-  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -11,7 +16,8 @@
   color: white;
   padding: 1rem;
   font-family: 'Segoe UI', sans-serif;
-  overflow: hidden;
+  transition: all 0.3s ease;
+  overflow-y: auto;
 }
 
 .HomePage.initial {
@@ -19,7 +25,7 @@
 }
 
 .HomePage.has-asked {
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .home-title {
@@ -36,22 +42,61 @@
   text-align: center;
 }
 
-.chat-response {
-  margin-top: 2rem;
+.chat-history {
+  flex-grow: 1;
+  width: 100%;
   max-width: 600px;
-  min-height: 4rem;
-  padding: 1rem;
-  background-color: #444654;
-  border-radius: 8px;
-  font-size: 1rem;
+  margin: 0 auto;
+  padding-bottom: 9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  scroll-behavior: smooth;
+}
+
+.chat-message {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  max-width: 80%;
   line-height: 1.5;
+  font-size: 1rem;
   white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+  background-color: #10a37f;
+  color: white;
+}
+
+.chat-message.bot {
+  align-self: flex-start;
+  background-color: #444654;
+  color: white;
+}
+
+.blinking-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  width: 1ch;
+  color: white;
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  50.01%, 100% {
+    opacity: 0;
+  }
 }
 
 .chat-box-wrapper {
   width: 100%;
   max-width: 600px;
-  transition: all 0.3 ease;
+  margin-top: 1rem;
 }
 
 .chat-box-wrapper.fixed-bottom {
