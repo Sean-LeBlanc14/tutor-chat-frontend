@@ -1,0 +1,141 @@
+.menu-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    transition: background-color 0.3s ease;
+}
+
+.menu-wrapper.sidebar-open {
+    background-color: #2e2f39;
+}
+
+.menu-wrapper.sidebar-closed {
+    background-color: #343541;
+}
+
+.menu-toggle {
+    position: relative;
+    top: 0.5rem;
+    right: 6rem;
+    font-size: 1.5rem;
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+.sidebar {
+    width: 250px;
+    color: white;
+    padding: 1rem;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    transform: translateX(0);
+  }
+
+  .menu {
+    transform: translateX(0);
+  }
+}
+
+.sidebar-header {
+    margin-bottom: 1rem;
+}
+
+.sidebar.closed {
+    transform: translateX(-100%);
+    visibility: hidden;
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.sidebar.open {
+    transform: translateX(0);
+    visibility: visible;
+    opacity: 1;
+}
+
+.new-chat-button {
+    background-color: #10a37f;
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    transition: background-color 0.2s ease;
+}
+
+.new-chat-button:hover {
+    background-color: #0d8467;
+}
+
+.chat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem
+}
+
+.chat-item {
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.chat-item:hover {
+    background-color: #3b3c47;
+}
+
+.chat-item.active {
+    background-color: #10a37f;
+    font-weight: bold;
+}
+
+.chat-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+}
+
+.rename-input {
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #ccc
+}
+
+.icon-btn:hover {
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: absolute;
+        transform: translateX(-100%);
+        z-index: 100;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+}

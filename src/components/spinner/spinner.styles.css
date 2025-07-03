@@ -1,18 +1,11 @@
 .spinner {
-    width: 24px;
-    height: 24px;
-    border: 3px solid white;
-    border-top: 3px solid transparent;
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-    background: none;
+  width: 10px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #0a6a54;
+  box-shadow: 0 0 0 0 #0004;
+  animation: l1 1s infinite;
 }
-
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
+@keyframes l1 {
+    100% {box-shadow: 0 0 0 10px #10a37f}
 }
