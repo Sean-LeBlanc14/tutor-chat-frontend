@@ -18,8 +18,10 @@ body, html {
 }
 
 .HomePage {
+  position: relative;
   flex: 1;
   display: flex;
+  height: 100vh;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -28,7 +30,7 @@ body, html {
   padding: 1rem;
   font-family: 'Segoe UI', sans-serif;
   transition: all 0.3s ease;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .HomePage.initial {
@@ -177,3 +179,14 @@ body, html {
   padding: 1rem 0;
 }
 
+@media (max-width: 768px) {
+  .app-layout {
+    display: block;
+  }
+
+  .HomePage {
+    width: 100vw;
+    height: 100vh;
+    overflow-y: auto;
+  }
+}

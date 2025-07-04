@@ -6,12 +6,34 @@ const Sidebar = ({ chatLogs, activeChatId, onNewChat, onSelectChat, onRenameChat
     const [editingChatId, setEditingChatId] = useState(null)
     const [editTitle, setEditTitle] = useState('')
     const [sidebarOpen, setSidebarOpen] = useState(true)
+    const [userToggled, setUserToggled] = useState(false)
+    const [isMobile, setIsMobile] = useState(false)
+
+    const toggleSidebar = () => {
+        setSidebarOpen(prev => !prev)
+        setUserToggled(true)
+    }
     
     useEffect(() => {
-    if (window.innerWidth < 768) {
-        setSidebarOpen(false)
-    }
-    }, [])
+        const handleResize = () => {
+            const width = window.innerWidth
+            setIsMobile(width < 768)
+
+            if (width < 768) {
+                setSidebarOpen(false)
+            } else {
+                if (!userToggled) {
+                    setSidebarOpen(true)
+                }
+            }
+        }
+
+        handleResize()
+
+        window.addEventListener('resize', handleResize)
+
+        return () => window.removeEventListener('resize', handleResize)
+    }, [userToggled])
 
     const handleRenameStart = (chat) => {
         setEditingChatId(chat.id)
@@ -28,15 +50,16 @@ const Sidebar = ({ chatLogs, activeChatId, onNewChat, onSelectChat, onRenameChat
         setEditTitle('')
     }
 
-    const toggleSidebar = () => {
-        setSidebarOpen(prev => !prev)
-    }
-
     return (
         <div className={`menu-wrapper ${sidebarOpen ? 'sidebar-open': 'sidebar-closed'}`}>
             <button className='menu-toggle' onClick={toggleSidebar}>
                 ☰
             </button>
+
+            {sidebarOpen && isMobile && (
+                <div className="overlay" onClick={toggleSidebar}></div>
+            )}
+
             <aside className={`sidebar ${sidebarOpen ? 'open': 'closed'}`}>
                 <div className='sidebar-header'>
                     <button className='new-chat-button' onClick={onNewChat}>
