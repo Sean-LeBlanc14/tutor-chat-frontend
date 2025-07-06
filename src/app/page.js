@@ -1,10 +1,16 @@
 "use client"
-import { useEffect, useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from './lib/supabaseClient'
+import { useAuth } from '@/app/lib/authContext'
 import SearchBox from '@/components/search-box/search-box.component'
 import Spinner from '@/components/spinner/spinner.component'
 import Sidebar from '@/components/sidebar/sidebar.component'
 
 const HomePage = () => {
+  const { user } = useAuth()
+  const router = useRouter()
+
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasAsked, setHasAsked] = useState(false)
@@ -74,7 +80,7 @@ const HomePage = () => {
     }
   }, [loading, messages])
 
-  const startNewChat = () => {
+  const startNewChat = async () => {
     const newChat = {
       id: crypto.randomUUID(),
       title: '',
@@ -85,6 +91,19 @@ const HomePage = () => {
     setChatLogs(prev => [newChat, ...prev])
     setActiveChatId(newChat.id)
     setHasAsked(false)
+
+    if (user?.email) {
+      const { error } = await supabase.from('chat_logs').insert({
+        chat_id: newChat.id,
+        user_email: user.email,
+        role: 'system',
+        content: 'New chat started'
+      })
+
+      if (error) {
+        console.error('Error creating new chat in Supabase:', error)
+      }
+    }
   }
 
   const handleSelectChat = (chatId) => {
@@ -92,12 +111,18 @@ const HomePage = () => {
     setHasAsked(true)
   }
 
-  const addMessageToActive = (role, content) => {
+  const addMessageToActive = async (role, content) => {
+    const newMessage = {
+      id: crypto.randomUUID(),
+      role,
+      content
+    }
+
     setChatLogs(prev =>
       prev.map(chat => {
         if (chat.id !== activeChatId) return chat
 
-        const newMessages = [...chat.messages, { id: crypto.randomUUID(), role, content }]
+        const newMessages = [...chat.messages, newMessage]
         let title = chat.title
         
         if (!title && role === 'user') {
@@ -109,6 +134,19 @@ const HomePage = () => {
         return { ...chat, title, messages: newMessages }
       })
     )
+
+    if (user?.email && activeChatId) {
+      const { error } = await supabase.from('chat_logs').insert({
+        chat_id: activeChatId,
+        user_email: user.email,
+        role,
+        content,
+      })
+
+      if (error) {
+        console.error('Error saving message to Supabase:', error)
+      }
+    }
   }
 
   useEffect(() => {
@@ -119,34 +157,76 @@ const HomePage = () => {
   }, [chatLogs, activeChatId])
 
   useEffect(() => {
-    const storedLogs = localStorage.getItem('chatLogs')
-    const storedActiveId = localStorage.getItem('activeChatId')
+    const loadChatsFromSupabase = async () => {
+      if (!user?.email) return
 
-    if (storedLogs) {
-      const parsedLogs = JSON.parse(storedLogs)
-      setChatLogs(parsedLogs)
-      if (storedActiveId) {
-        setActiveChatId(storedActiveId)
-        
-        const activeChat = parsedLogs.find(chat => chat.id === storedActiveId)
-        if (activeChat && activeChat.messages.length > 0) {
-          setHasAsked(true)
-        }
+      const { data, error } = await supabase
+        .from('chat_logs')
+        .select('*')
+        .eq('user_email', user.email)
+        .order('created_at', {ascending: true })
+
+      if (error != null) {
+        console.error('Error fetching chat logs:', error)
+        return
       }
-    } else {
-      startNewChat()
-    }
-  }, [])
 
-  const handleRenameChat = (chatId, newTitle) => {
+      const groupedChats = {}
+
+      for (const msg of data) {
+        if (!groupedChats[msg.chat_id]) {
+          groupedChats[msg.chat_id] = {
+            id: msg.chat_id,
+            title: '',
+            messages: [],
+            createdAt: new Date(msg.created_at).getTime()
+          }
+        }
+
+        groupedChats[msg.chat_id].messages.push({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content
+        })
+      }
+
+      const chatArray = Object.values(groupedChats).sort(
+        (a, b) => b.createdAt - a.createdAt
+      )
+
+      setChatLogs(chatArray)
+      if (chatArray.length > 0) {
+        setActiveChatId(chatArray[0].id)
+        setHasAsked(chatArray[0].messages.length > 0)
+      } else {
+        startNewChat()
+      }
+    }
+
+    loadChatsFromSupabase()
+  }, [user])
+
+  const handleRenameChat = async (chatId, newTitle) => {
     setChatLogs(prev =>
       prev.map(chat =>
         chat.id === chatId ? { ...chat, title: newTitle } : chat
       )
     )
+
+    if (user?.email) {
+      const { error } = await supabase
+        .from('chat_logs')
+        .update({ title: newTitle })
+        .eq('chat_id', chatId)
+        .eq('user_email', user.email)
+
+      if (error) {
+        console.error('Failed to update title in Supabase:', error)
+      }
+    }
   }
 
-  const handleDeleteChat = (chatId) => {
+  const handleDeleteChat = async (chatId) => {
     setChatLogs(prev => {
       const updated = prev.filter(chat => chat.id !== chatId)
 
@@ -162,7 +242,25 @@ const HomePage = () => {
 
       return updated
     })
+
+    if (user?.email) {
+      const { error } = await supabase
+        .from('chat_logs')
+        .delete()
+        .eq('chat_id', chatId)
+        .eq('user_email', user.email)
+
+      if (error) {
+        console.error('Error deleting from Supabase:', error)
+      }
+    }
   }
+
+  useEffect(() => {
+    if (user === null) {
+      router.push('/login')
+    }
+  }, [user, router])
 
   return (
     <div className='app-layout'>

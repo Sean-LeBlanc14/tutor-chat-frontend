@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { supabase } from '@/app/lib/supabaseClient'
 import './sidebar.styles.css'
 
 const Sidebar = ({ chatLogs, activeChatId, onNewChat, onSelectChat, onRenameChat, onDeleteChat }) => {
@@ -8,6 +9,15 @@ const Sidebar = ({ chatLogs, activeChatId, onNewChat, onSelectChat, onRenameChat
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [userToggled, setUserToggled] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
+
+    const handleLogout = async () => {
+        localStorage.removeItem('chatLogs')
+        localStorage.removeItem('activeChatId')
+        
+        await supabase.auth.signOut()
+
+        window.location.href = '/login'
+    }
 
     const toggleSidebar = () => {
         setSidebarOpen(prev => !prev)
@@ -54,6 +64,9 @@ const Sidebar = ({ chatLogs, activeChatId, onNewChat, onSelectChat, onRenameChat
         <div className={`menu-wrapper ${sidebarOpen ? 'sidebar-open': 'sidebar-closed'}`}>
             <button className='menu-toggle' onClick={toggleSidebar}>
                 ☰
+            </button>
+            <button className='logout-button' onClick={handleLogout}>
+                Log Out
             </button>
 
             {sidebarOpen && isMobile && (

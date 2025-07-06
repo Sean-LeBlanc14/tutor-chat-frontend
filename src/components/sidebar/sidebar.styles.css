@@ -23,6 +23,28 @@
     color: white;
     cursor: pointer;
     z-index: 1001;
+    margin-bottom: 1rem;
+}
+
+.logout-button {
+    position: relative;
+    top: 0.5rem;
+    right: -1rem;
+    width: 40%;
+    font-size: 1rem;
+    font-weight: bold;
+    color: white;
+    border: none;
+    background-color: #e74c3c;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    z-index: 1001;
+    margin-bottom: 1rem;
+}
+
+.logout-button:hover {
+    background-color: #c0392b;
 }
 
 .overlay {
@@ -175,5 +197,12 @@
     .menu-toggle {
         position: absolute;
         right: 1rem;
+    }
+
+    .logout-button {
+        position: absolute;
+        top: 3.5rem;
+        right: 1rem;
+        width: 15%;
     }
 }
