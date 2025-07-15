@@ -3,12 +3,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from './lib/supabaseClient'
 import { useAuth } from '@/app/lib/authContext'
+import { useRole } from '@/hooks/useRole'
 import SearchBox from '@/components/search-box/search-box.component'
 import Spinner from '@/components/spinner/spinner.component'
 import Sidebar from '@/components/sidebar/sidebar.component'
 
 const HomePage = () => {
   const { user } = useAuth()
+  const { isAdmin, loading: roleLoading } = useRole()
   const router = useRouter()
 
   const [query, setQuery] = useState('')
@@ -38,7 +40,7 @@ const HomePage = () => {
     setQuery('')
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/chat', {
+      const res = await fetch('http://localhost:8080/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: query }),
@@ -70,7 +72,7 @@ const HomePage = () => {
         if (currentText.length >= fullText.length) {
           clearInterval(interval)
 
-           if (chatHistoryRef.current) {
+          if (chatHistoryRef.current) {
             chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
           }
         }
@@ -271,6 +273,7 @@ const HomePage = () => {
         onSelectChat={handleSelectChat}
         onRenameChat={handleRenameChat}
         onDeleteChat={handleDeleteChat}
+        isAdmin={isAdmin}
       />
 
       <div className={`HomePage ${hasAsked ? 'has-asked' : 'initial'}`}>

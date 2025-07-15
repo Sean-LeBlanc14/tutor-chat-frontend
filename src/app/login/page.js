@@ -55,7 +55,7 @@ const LoginPage = () => {
 
                 <input
                     type='password'
-                    placeholder='Password (mocked for now)'
+                    placeholder='Password'
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     required

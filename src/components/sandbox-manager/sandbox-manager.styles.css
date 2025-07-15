@@ -1,0 +1,270 @@
+.sandbox-manager {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;;
+    background-color: #444654;
+    border: 1px solid #565869;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 1rem;
+    color: white;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.btn-primary {
+    background-color: #10a37f;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0e8c6f;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background-color: #10a37f;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #0e8c6f;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: #565869;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #4a4c5a;
+    transform: translateY(-1px);
+}
+
+.create-form {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #565869;
+    border-radius: 12px;
+    background-color: #343541;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-label {
+    display: block;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: white;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #565869;
+    border-radius: 12px;
+    font-size: 1rem;
+    background-color: #444654;
+    color: white;
+    transition: all 0.3s ease;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #10a37f;
+    box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+}
+
+.form-input::placeholder {
+    color: #c5c5d2;
+}
+
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #565869;
+    border-radius: 12px;
+    font-size: 1rem;
+    height: 8rem;
+    resize: vertical;
+    background-color: #444654;
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+    transition: all 0.3s ease;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: #10a37f;
+    box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+}
+
+.form-textarea::placeholder {
+    color: #c5c5d2;
+}
+
+.form-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.environments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.empty-state {
+    color: #c5c5d2;
+    text-align: center;
+    padding: 2rem 0;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.environment-item {
+    padding: 1rem;
+    border: 1px solid #565869;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #343541;
+}
+
+.environment-item:hover {
+    background-color: #444654;
+    transform: translateY(-1px);
+}
+
+.environment-item.selected {
+    background-color: #10a37f;
+    border-color: #10a37f;
+}
+
+.environment-item.selected:hover {
+    background-color: #0e8c6f;
+}
+
+.environment-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.environment-info {
+    flex: 1;
+}
+
+.environment-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin: 0 0 0.5rem 0;
+    color: white;
+}
+
+.environment-description {
+    font-size: 0.9rem;
+    color: #c5c5d2;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
+}
+
+.environment-date {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin: 0;
+}
+
+.btn-delete {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.btn-delete:hover {
+    color: #dc2626;
+    background-color: rgba(239, 68, 68, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Scrollbar styling to match main page */
+.environments-list::-webkit-scrollbar {
+    width: 14px;
+}
+
+.environments-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.environments-list::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .sandbox-manager {
+        padding: 1rem;
+    }
+    
+    .header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .environment-content {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
