@@ -1,7 +1,6 @@
 "use client"
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from './lib/supabaseClient'
 import { useAuth } from '@/app/lib/authContext'
 import { useRole } from '@/hooks/useRole'
 import SearchBox from '@/components/search-box/search-box.component'
@@ -19,21 +18,59 @@ const HomePage = () => {
   const [displayedText, setDisplayedText] = useState('')
   const [chatLogs, setChatLogs] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
+  const [chatsLoaded, setChatsLoaded] = useState(false) // Track if chats have been loaded
 
   const chatHistoryRef = useRef(null)
 
-  const activeChat = chatLogs.find(chat => chat.id === activeChatId)
-  const messages = activeChat?.messages || []
+  const activeChat = useMemo(() => 
+    chatLogs.find(chat => chat.id === activeChatId), 
+    [chatLogs, activeChatId]
+  )
+  
+  const messages = useMemo(() => 
+    activeChat?.messages || [], 
+    [activeChat?.messages]
+  )
 
   const handleInputChange = (event) => {
     setQuery(event.target.value)
+  }
+
+  // Function to generate a chat title from the first message
+  const generateChatTitle = (message) => {
+    // Clean the message and extract key parts
+    let title = message.trim()
+    
+    // Remove common question words and clean up
+    title = title.replace(/^(what|how|why|when|where|who|can|could|would|should|is|are|do|does|did|tell me about|explain)\s+/i, '')
+    
+    // Take first 30 characters and find a good breaking point
+    if (title.length > 30) {
+      const truncated = title.substring(0, 30)
+      const lastSpace = truncated.lastIndexOf(' ')
+      title = lastSpace > 15 ? truncated.substring(0, lastSpace) : truncated
+    }
+    
+    // Remove trailing punctuation
+    title = title.replace(/[.!?]*$/, '')
+    
+    // Capitalize first letter
+    title = title.charAt(0).toUpperCase() + title.slice(1)
+    
+    // Fallback if title is too short or empty
+    if (title.length < 3) {
+      title = 'New Chat'
+    }
+    
+    return title
   }
   
   const handleFormSubmit = async (event) => {
     event.preventDefault()
     if (query.trim() === '') return
 
-    addMessageToActive('user', query)
+    const userQuery = query
+    addMessageToActive('user', userQuery)
     setLoading(true)
     setDisplayedText('')
     setHasAsked(true)
@@ -43,7 +80,7 @@ const HomePage = () => {
       const res = await fetch('http://localhost:8080/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: query }),
+        body: JSON.stringify({ question: userQuery }),
       })
 
       const data = await res.json()
@@ -82,153 +119,259 @@ const HomePage = () => {
     }
   }, [loading, messages])
 
-  const startNewChat = async () => {
-    const newChat = {
-      id: crypto.randomUUID(),
-      title: '',
-      messages: [],
-      createdAt: Date.now()
-    }
+  const startNewChat = useCallback(async () => {
+    if (!user?.email) return
 
-    setChatLogs(prev => [newChat, ...prev])
-    setActiveChatId(newChat.id)
-    setHasAsked(false)
-
-    if (user?.email) {
-      const { error } = await supabase.from('chat_logs').insert({
-        chat_id: newChat.id,
-        user_email: user.email,
-        role: 'system',
-        content: 'New chat started'
+    try {
+      const response = await fetch('http://localhost:8080/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_email: user.email })
       })
 
-      if (error) {
-        console.error('Error creating new chat in Supabase:', error)
+      if (!response.ok) {
+        throw new Error('Failed to create new chat')
       }
+
+      const data = await response.json()
+      const newChatId = data.chat_id
+
+      const newChat = {
+        id: newChatId,
+        title: '',
+        messages: [],
+        created_at: new Date().toISOString()
+      }
+
+      setChatLogs(prev => [newChat, ...prev])
+      setActiveChatId(newChatId)
+      setHasAsked(false)
+
+    } catch (error) {
+      console.error('Error creating new chat:', error)
+
+      const newChat = {
+        id: crypto.randomUUID(),
+        title: '',
+        messages: [],
+        created_at: new Date().toISOString()
+      }
+      setChatLogs(prev => [newChat, ...prev])
+      setActiveChatId(newChat.id)
+      setHasAsked(false)
     }
-  }
+  }, [user?.email])
 
   const handleSelectChat = (chatId) => {
     setActiveChatId(chatId)
-    setHasAsked(true)
+    const selectedChat = chatLogs.find(chat => chat.id === chatId)
+    setHasAsked(selectedChat?.messages.length > 0)
   }
 
   const addMessageToActive = async (role, content) => {
-    const newMessage = {
-      id: crypto.randomUUID(),
-      role,
-      content
-    }
+      const newMessage = {
+          id: crypto.randomUUID(),
+          role,
+          content
+      }
 
-    setChatLogs(prev =>
-      prev.map(chat => {
-        if (chat.id !== activeChatId) return chat
+      // Update local state immediately for responsive UI
+      setChatLogs(prev =>
+          prev.map(chat => {
+              if (chat.id !== activeChatId) return chat
 
-        const newMessages = [...chat.messages, newMessage]
-        let title = chat.title
-        
-        if (!title && role === 'user') {
-          const trimmed = content.trim()
-          title = trimmed.slice(0, 30).replace(/[.!?]*$/, '')
-          title = title.charAt(0).toUpperCase() + title.slice(1)
+              const newMessages = [...chat.messages, newMessage]
+              let title = chat.title
+              
+              // Auto-generate title from first user message
+              if (!title && role === 'user' && chat.messages.length === 0) {
+                  title = generateChatTitle(content)
+              }
+
+              return { ...chat, title, messages: newMessages }
+          })
+      )
+
+    // Save to backend
+    if (user?.email && activeChatId) {
+      try {
+        const response = await fetch(`http://localhost:8080/api/chats/${activeChatId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            user_email: user.email,
+            role,
+            content
+          })
+        })
+
+        if (!response.ok) {
+          console.error('Failed to save message to backend')
         }
 
-        return { ...chat, title, messages: newMessages }
-      })
-    )
+        // Update title in backend if this is the first user message
+        const chat = chatLogs.find(c => c.id === activeChatId)
+        if (chat && chat.title && !chat.title.includes('New Chat') && role === 'user' && chat.messages.length === 1) {
+          await updateChatTitleInBackend(activeChatId, chat.title)
+        }
 
-    if (user?.email && activeChatId) {
-      const { error } = await supabase.from('chat_logs').insert({
-        chat_id: activeChatId,
-        user_email: user.email,
-        role,
-        content,
-      })
-
-      if (error) {
-        console.error('Error saving message to Supabase:', error)
+      } catch (error) {
+        console.error('Error saving message:', error)
       }
     }
   }
 
+  const updateChatTitleInBackend = async (chatId, title) => {
+    try {
+      console.log('Updating chat title:', { chatId, title }) // Debug log
+      
+      const response = await fetch(`http://localhost:8080/api/chats/${chatId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          title,
+          user_email: user?.email // Add user_email if backend requires it
+        })
+      })
+
+      console.log('Update response status:', response.status) // Debug log
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Failed to update chat title - Response:', errorData)
+        return false
+      }
+
+      const responseData = await response.json()
+      console.log('Update successful - Backend response:', responseData) // Debug log
+      
+      // Force a refresh of chat data to verify the update persisted
+      setTimeout(() => {
+        console.log('Verifying title update...')
+        // Re-fetch the specific chat to verify it was updated
+        fetch(`http://localhost:8080/api/chats/${encodeURIComponent(user.email)}`, {
+          method: 'GET',
+          credentials: 'include'
+        })
+        .then(res => res.json())
+        .then(chats => {
+          const updatedChat = chats.find(c => c.id === chatId)
+          console.log('Chat after update:', updatedChat)
+          if (updatedChat && updatedChat.title !== title) {
+            console.error('Title update did not persist in database!')
+          }
+        })
+      }, 1000)
+      
+      return true
+
+    } catch (error) {
+      console.error('Error updating chat title:', error)
+      return false
+    }
+  }
+
+  // Load chats when user changes
   useEffect(() => {
-    if (chatLogs.length === 0) return
-
-    localStorage.setItem('chatLogs', JSON.stringify(chatLogs))
-    localStorage.setItem('activeChatId', activeChatId)
-  }, [chatLogs, activeChatId])
-
-  useEffect(() => {
-    const loadChatsFromSupabase = async () => {
-      if (!user?.email) return
-
-      const { data, error } = await supabase
-        .from('chat_logs')
-        .select('*')
-        .eq('user_email', user.email)
-        .order('created_at', {ascending: true })
-
-      if (error != null) {
-        console.error('Error fetching chat logs:', error)
+    const loadChatsFromBackend = async () => {
+      if (!user?.email) {
+        setChatsLoaded(false)
         return
       }
 
-      const groupedChats = {}
+      try {
+        console.log('Loading chats for user:', user.email) // Debug log
+        
+        const response = await fetch(`http://localhost:8080/api/chats/${encodeURIComponent(user.email)}`, {
+          method: 'GET',
+          credentials: 'include'
+        })
 
-      for (const msg of data) {
-        if (!groupedChats[msg.chat_id]) {
-          groupedChats[msg.chat_id] = {
-            id: msg.chat_id,
-            title: '',
-            messages: [],
-            createdAt: new Date(msg.created_at).getTime()
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated, redirect to login
+            router.push('/login')
+            return
           }
+          throw new Error('Failed to load chats')
         }
 
-        groupedChats[msg.chat_id].messages.push({
-          id: msg.id,
-          role: msg.role,
-          content: msg.content
-        })
-      }
+        const chats = await response.json()
+        console.log('Loaded chats from backend:', chats) // Debug log - check if titles are correct here
+        
+        setChatLogs(chats)
+        
+        if (chats.length > 0) {
+          // Set the most recent chat as active
+          const mostRecentChat = chats[0]
+          setActiveChatId(mostRecentChat.id)
+          setHasAsked(mostRecentChat.messages.length > 0)
+        } else {
+          // No chats exist, we'll create one when needed
+          setActiveChatId(null)
+          setHasAsked(false)
+        }
+        
+        setChatsLoaded(true)
 
-      const chatArray = Object.values(groupedChats).sort(
-        (a, b) => b.createdAt - a.createdAt
-      )
-
-      setChatLogs(chatArray)
-      if (chatArray.length > 0) {
-        setActiveChatId(chatArray[0].id)
-        setHasAsked(chatArray[0].messages.length > 0)
-      } else {
-        startNewChat()
+      } catch (error) {
+        console.error('Error loading chats:', error)
+        setChatLogs([])
+        setActiveChatId(null)
+        setHasAsked(false)
+        setChatsLoaded(true)
       }
     }
 
-    loadChatsFromSupabase()
-  }, [user])
+    loadChatsFromBackend()
+  }, [user?.email, router])
+
+  // Auto-create new chat if no chats exist after loading
+  useEffect(() => {
+    if (chatsLoaded && user?.email && chatLogs.length === 0) {
+      startNewChat()
+    }
+  }, [chatsLoaded, user?.email, chatLogs.length, startNewChat])
 
   const handleRenameChat = async (chatId, newTitle) => {
+    // Store original title for rollback if needed
+    const originalTitle = chatLogs.find(chat => chat.id === chatId)?.title
+
+    // Update local state immediately for responsive UI
     setChatLogs(prev =>
       prev.map(chat =>
         chat.id === chatId ? { ...chat, title: newTitle } : chat
       )
     )
 
-    if (user?.email) {
-      const { error } = await supabase
-        .from('chat_logs')
-        .update({ title: newTitle })
-        .eq('chat_id', chatId)
-        .eq('user_email', user.email)
-
-      if (error) {
-        console.error('Failed to update title in Supabase:', error)
+    // Update backend
+    try {
+      const success = await updateChatTitleInBackend(chatId, newTitle)
+      if (!success) {
+        // Rollback on failure
+        setChatLogs(prev =>
+          prev.map(chat =>
+            chat.id === chatId ? { ...chat, title: originalTitle } : chat
+          )
+        )
+        console.error('Failed to update chat title, rolling back')
       }
+    } catch (error) {
+      // Rollback on error
+      setChatLogs(prev =>
+        prev.map(chat =>
+          chat.id === chatId ? { ...chat, title: originalTitle } : chat
+        )
+      )
+      console.error('Error updating chat title, rolling back:', error)
     }
   }
 
   const handleDeleteChat = async (chatId) => {
+    // Update local state immediately
     setChatLogs(prev => {
       const updated = prev.filter(chat => chat.id !== chatId)
 
@@ -245,24 +388,39 @@ const HomePage = () => {
       return updated
     })
 
+    // Delete from backend
     if (user?.email) {
-      const { error } = await supabase
-        .from('chat_logs')
-        .delete()
-        .eq('chat_id', chatId)
-        .eq('user_email', user.email)
+      try {
+        const response = await fetch(`http://localhost:8080/api/chats/${chatId}?user_email=${encodeURIComponent(user.email)}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
 
-      if (error) {
-        console.error('Error deleting from Supabase:', error)
+        if (!response.ok) {
+          console.error('Failed to delete chat from backend')
+        }
+      } catch (error) {
+        console.error('Error deleting chat:', error)
       }
     }
   }
 
+  // Redirect to login if user is null
   useEffect(() => {
     if (user === null) {
       router.push('/login')
     }
   }, [user, router])
+
+  // Show loading state while chats are being loaded
+  if (user && !chatsLoaded) {
+    return (
+      <div className="loading-container">
+        <Spinner />
+        <p>Loading your chats...</p>
+      </div>
+    )
+  }
 
   return (
     <div className='app-layout'>
@@ -277,7 +435,7 @@ const HomePage = () => {
       />
 
       <div className={`HomePage ${hasAsked ? 'has-asked' : 'initial'}`}>
-        {chatLogs.length === 0 ? (
+        {chatLogs.length === 0 && chatsLoaded ? (
           <div className="empty-state">
             <h1>No Chats Yet</h1>
             <p>Would you like to start a new chat?</p>
@@ -329,7 +487,6 @@ const HomePage = () => {
         )}
       </div>
     </div>
-
   )
 }
 

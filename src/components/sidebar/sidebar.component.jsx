@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/app/lib/supabaseClient'
+import { useAuth } from '@/app/lib/authContext'
+import { FiPlus, FiEdit2, FiTrash2, FiMessageSquare, FiSettings, FiLogOut, FiMenu, FiX } from 'react-icons/fi'
 import './sidebar.styles.css'
 
 const Sidebar = ({ 
@@ -12,11 +13,8 @@ const Sidebar = ({
     onSelectChat, 
     onRenameChat, 
     onDeleteChat,
-    sandboxEnvironments = [],
-    onSelectEnvironment,
     isAdmin
 }) => {
-
     const [editingChatId, setEditingChatId] = useState(null)
     const [editTitle, setEditTitle] = useState('')
     const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -26,6 +24,7 @@ const Sidebar = ({
 
     const router = useRouter()
     const pathname = usePathname()
+    const { logout } = useAuth()
 
     const toggleSidebar = () => {
         setSidebarOpen(prev => !prev)
@@ -47,11 +46,21 @@ const Sidebar = ({
         }
 
         handleResize()
-
         window.addEventListener('resize', handleResize)
-
         return () => window.removeEventListener('resize', handleResize)
     }, [userToggled])
+
+    // Add/remove class to body for desktop sidebar state
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const body = document.body
+            if (sidebarOpen && window.innerWidth >= 768) {
+                body.classList.add('sidebar-open')
+            } else {
+                body.classList.remove('sidebar-open')
+            }
+        }
+    }, [sidebarOpen])
 
     useEffect(() => {
         if (pathname.startsWith('/sandbox')) {
@@ -62,16 +71,20 @@ const Sidebar = ({
     }, [pathname])
 
     const handleLogout = async () => {
-        localStorage.clear()
-        
-        await supabase.auth.signOut()
-
-        window.location.href = '/login'
+        try {
+            await logout()
+            localStorage.clear()
+            router.push('/login')
+        } catch (error) {
+            console.error('Logout error:', error)
+            localStorage.clear()
+            router.push('/login')
+        }
     }
 
     const handleRenameStart = (chat) => {
         setEditingChatId(chat.id)
-        setEditTitle(chat.title)
+        setEditTitle(chat.title || '')
     }
 
     const handleRenameSubmit = (chatId) => {
@@ -79,7 +92,11 @@ const Sidebar = ({
         if (newTitle) {
             onRenameChat(chatId, newTitle)
         }
+        setEditingChatId(null)
+        setEditTitle('')
+    }
 
+    const handleRenameCancel = () => {
         setEditingChatId(null)
         setEditTitle('')
     }
@@ -90,85 +107,123 @@ const Sidebar = ({
     }
 
     return (
-        <div className={`menu-wrapper ${sidebarOpen ? 'sidebar-open': 'sidebar-closed'}`}>
-            <button className='menu-toggle' onClick={toggleSidebar}>
-                ☰
-            </button>
-            <button className='logout-button' onClick={handleLogout}>
-                Log Out
+        <>
+            {/* Mobile Toggle Button */}
+            <button 
+                className={`sidebar-toggle ${sidebarOpen ? 'open' : ''}`} 
+                onClick={toggleSidebar}
+                aria-label="Toggle sidebar"
+            >
+                {sidebarOpen ? <FiX size={20} /> : <FiMenu size={20} />}
             </button>
 
+            {/* Mobile Overlay */}
             {sidebarOpen && isMobile && (
-                <div className="overlay" onClick={toggleSidebar}></div>
+                <div className="sidebar-overlay" onClick={toggleSidebar}></div>
             )}
 
-            <aside className={`sidebar ${sidebarOpen ? 'open': 'closed'}`}>
+            {/* Sidebar */}
+            <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+                {/* Header Section */}
                 <div className='sidebar-header'>
-                    <button className='new-chat-button' onClick={onNewChat}>
-                        + {mode === 'chat' ? 'New Chat': 'New Test'}
+                    <button className='new-chat-btn' onClick={onNewChat}>
+                        <FiPlus size={18} />
+                        {mode === 'chat' ? 'New Chat' : 'New Test'}
                     </button>
 
                     {isAdmin && (
-                        <div className='mode-toggle'>
+                        <div className='mode-switcher'>
                             <button
-                                className={`mode-button ${mode === 'chat' ? 'active' : ''}`}
+                                className={`mode-btn ${mode === 'chat' ? 'active' : ''}`}
                                 onClick={() => handleModeSwitch('chat')}
                             >
+                                <FiMessageSquare size={16} />
                                 Chat
                             </button>
                             <button
-                                className={`mode-button ${mode === 'sandbox' ? 'active' : ''}`}
+                                className={`mode-btn ${mode === 'sandbox' ? 'active' : ''}`}
                                 onClick={() => handleModeSwitch('sandbox')}
                             >
+                                <FiSettings size={16} />
                                 Sandbox
                             </button>
                         </div>
                     )}
                 </div>
 
+                {/* Chat/Session List */}
                 <div className='chat-list'>
-                    {mode === 'chat' && chatLogs.map(chat => (
-                        <div
-                            key={chat.id}
-                            className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
-                            onClick={() => onSelectChat(chat.id)}
-                        >
-                            {editingChatId === chat.id ? (
-                                <input
-                                    className='rename-input'
-                                    value={editTitle}
-                                    onChange={(event) => setEditTitle(event.target.value)}
-                                    onBlur={() => handleRenameSubmit(chat.id)}
-                                    onKeyDown={(event) => event.key === 'Enter' && handleRenameSubmit(chat.id)}
-                                    autoFocus
-                                />
-                            ) : (
-                                <div className='chat-title-row' onClick={() => onSelectChat(chat.id)}>
-                                    <span className='chat-title-text'>
-                                        {chat.title || 'New Chat'}
-                                    </span>
-                                    <button className='icon-btn' onClick={(event) => {event.stopPropagation(); handleRenameStart(chat) }}>✏️</button>
-                                    <button className='icon-btn' onClick={(event) => {event.stopPropagation(); onDeleteChat(chat.id) }}>🗑️</button>
-                                </div>
-                            )}
+                    {chatLogs.length === 0 ? (
+                        <div className='empty-chat-list'>
+                            <p>No {mode === 'chat' ? 'chats' : 'sessions'} yet</p>
                         </div>
-                    ))}
-
-                    {mode === 'sandbox' && sandboxEnvironments.map(env => (
-                        <div
-                            key={env.id}
-                            className='chat-item'
-                            onClick={() => onSelectEnvironment(env)}
-                        >
-                            <div className='chat-title-row'>
-                                <span className='chat-title-text'>{env.name || 'Untitled Env'}</span>
-                                <span className='chat-title-sub'>Prompt: {env.system_prompt?.slice(0, 30) || '...'}</span>
+                    ) : (
+                        chatLogs.map(chat => (
+                            <div
+                                key={chat.id}
+                                className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
+                                onClick={() => onSelectChat(chat.id)}
+                            >
+                                {editingChatId === chat.id ? (
+                                    <div className='chat-rename'>
+                                        <input
+                                            className='rename-input'
+                                            value={editTitle}
+                                            onChange={(e) => setEditTitle(e.target.value)}
+                                            onBlur={() => handleRenameSubmit(chat.id)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleRenameSubmit(chat.id)
+                                                if (e.key === 'Escape') handleRenameCancel()
+                                            }}
+                                            autoFocus
+                                            maxLength={50}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className='chat-content'>
+                                        <div className='chat-title'>
+                                            {chat.title || `New ${mode === 'chat' ? 'Chat' : 'Session'}`}
+                                        </div>
+                                        <div className='chat-actions'>
+                                            <button 
+                                                className='action-btn edit-btn'
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleRenameStart(chat)
+                                                }}
+                                                aria-label="Rename"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button 
+                                                className='action-btn delete-btn'
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    if (confirm(`Delete this ${mode}?`)) {
+                                                        onDeleteChat(chat.id)
+                                                    }
+                                                }}
+                                                aria-label="Delete"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
+                </div>
+
+                {/* Footer Section */}
+                <div className='sidebar-footer'>
+                    <button className='logout-btn' onClick={handleLogout}>
+                        <FiLogOut size={18} />
+                        Sign Out
+                    </button>
                 </div>
             </aside>
-        </div>
+        </>
     )
 }
 

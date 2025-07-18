@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/app/lib/authContext'
-import { supabase } from '@/app/lib/supabaseClient'
 
 export const useRole = () => {
     const { user } = useAuth()
@@ -18,25 +17,18 @@ export const useRole = () => {
             }
 
             try {
-                const { data, error } = await supabase
-                    .from('users')
-                    .select('user_role')
-                    .eq('id', user.id)
-                    .single()
-
-                if (error) {
-                    console.error('Error fetching user role:', error)
-                    setRole('student')
-                } else {
-                    setRole(data?.user_role || 'student')
-                }
+                // The user role is already included in the user object from auth context
+                // No need for an additional API call since we get it from /api/me
+                const userRole = user.user_role || 'student'
+                setRole(userRole)
             } catch (error) {
                 console.error('Error in getRole:', error)
-                setRole('student')
+                setRole('student') // Default fallback
             } finally {
                 setLoading(false)
             }
         }
+        
         getRole()
     }, [user])
 

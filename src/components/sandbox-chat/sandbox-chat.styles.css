@@ -1,0 +1,156 @@
+/* Environment Info Card */
+.environment-info-card {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--color-bg-secondary, #343541) 0%, var(--color-bg-tertiary, #2d2d3a) 100%);
+    border: 1px solid var(--color-border, #565869);
+    border-radius: var(--border-radius-large, 16px);
+    box-shadow: var(--shadow, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+    transition: var(--transition, all 0.2s ease);
+}
+
+.environment-info-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-large, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+    border-color: var(--color-border-light, #6b6d7a);
+}
+
+.environment-info-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: var(--color-text-primary, #ffffff);
+    background: linear-gradient(135deg, var(--color-accent, #10a37f), #0e8c6f);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.environment-info-description {
+    font-size: 1rem;
+    color: var(--color-text-secondary, #c5c5d2);
+    margin: 0 0 1rem 0;
+    line-height: 1.5;
+}
+
+/* Environment Prompt Details */
+.environment-prompt-details {
+    margin-top: 1rem;
+}
+
+.environment-prompt-summary {
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-accent, #10a37f);
+    padding: 0.75rem 1rem;
+    background-color: rgba(16, 163, 127, 0.1);
+    border: 1px solid rgba(16, 163, 127, 0.2);
+    border-radius: var(--border-radius, 12px);
+    transition: var(--transition, all 0.2s ease);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+
+.environment-prompt-summary:hover {
+    background-color: rgba(16, 163, 127, 0.15);
+    border-color: rgba(16, 163, 127, 0.3);
+    transform: translateY(-1px);
+}
+
+.environment-prompt-summary::before {
+    content: '▶';
+    font-size: 0.8rem;
+    transition: transform 0.2s ease;
+}
+
+.environment-prompt-details[open] .environment-prompt-summary::before {
+    transform: rotate(90deg);
+}
+
+.environment-prompt-content {
+    margin-top: 0.75rem;
+    padding: 1.25rem;
+    background-color: var(--color-bg-primary, #444654);
+    border: 1px solid var(--color-border, #565869);
+    border-radius: var(--border-radius, 12px);
+    font-size: 0.9rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+    line-height: 1.6;
+    color: var(--color-text-primary, #ffffff);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-x: auto;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Scrollbar for prompt content */
+.environment-prompt-content::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+
+.environment-prompt-content::-webkit-scrollbar-track {
+    background: var(--color-bg-secondary, #343541);
+    border-radius: 3px;
+}
+
+.environment-prompt-content::-webkit-scrollbar-thumb {
+    background-color: var(--color-border, #565869);
+    border-radius: 3px;
+}
+
+.environment-prompt-content::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-light, #6b6d7a);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .environment-info-card {
+        margin-bottom: 1.5rem;
+        padding: 1.25rem;
+    }
+    
+    .environment-info-title {
+        font-size: 1.1rem;
+    }
+    
+    .environment-prompt-summary {
+        font-size: 0.9rem;
+        padding: 0.625rem 0.875rem;
+    }
+    
+    .environment-prompt-content {
+        padding: 1rem;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .environment-info-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .environment-info-title {
+        font-size: 1rem;
+    }
+    
+    .environment-prompt-content {
+        padding: 0.875rem;
+        font-size: 0.8rem;
+    }
+}
