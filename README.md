@@ -2,7 +2,7 @@
 
 > **Portfolio Project** - A modern React/Next.js application demonstrating full-stack development skills, secure authentication, and production-ready UI/UX design.
 
-**🔗 Live Demo**: [View Application](will-update-with-actual-URL) | **Backend Repository**: [Link to backend repo]
+**🔗 Live Demo**: [View Application](will-update-with-actual-URL) | **Backend Repository**: [https://github.com/Sean-LeBlanc14/tutor-chat-backend]
 
 ## 🚀 Project Overview
 
