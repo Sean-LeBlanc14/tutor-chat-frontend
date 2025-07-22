@@ -200,7 +200,7 @@ This project showcases skills essential for modern frontend development roles:
 
 ## 📞 Contact
 
-Sean LeBlanc-Grappendorf - Computer Science Student at Cal Poly San Luis Obispo
+**Sean LeBlanc-Grappendorf** - Computer Science Student at Cal Poly San Luis Obispo
 - **Email**: [seanaugustlg2006@gmail.com]
 - **LinkedIn**: [https://www.linkedin.com/in/sean-leblanc-grappendorf-6045a8331/]
 - **Portfolio**: [https://seanlg.com/]
