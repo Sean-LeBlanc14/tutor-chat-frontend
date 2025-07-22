@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../app/lib/authContext'
 import './sandbox-manager.styles.css'
 import { useRouter } from 'next/navigation'
+import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
 
 const SandboxManager = ({ onEnvironmentSelect, selectedEnvironment }) => {
     const router = useRouter()
@@ -24,10 +25,8 @@ const SandboxManager = ({ onEnvironmentSelect, selectedEnvironment }) => {
 
     const fetchEnvironments = async () => {
         try {
-            const response = await fetch('http://localhost:8080/api/sandbox/environments', {
-                method: 'GET',
-                credentials: 'include'
-            })
+            // FIXED: Use API_ENDPOINTS instead of hardcoded URL
+            const response = await apiRequest(API_ENDPOINTS.sandbox.environments)
 
             if (!response.ok) {
                 throw new Error('Failed to fetch environments')
@@ -52,10 +51,9 @@ const SandboxManager = ({ onEnvironmentSelect, selectedEnvironment }) => {
         }
 
         try {
-            const response = await fetch('http://localhost:8080/api/sandbox/environments', {
+            // FIXED: Use API_ENDPOINTS instead of hardcoded URL
+            const response = await apiRequest(API_ENDPOINTS.sandbox.createEnvironment, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify(newEnvironment)
             })
 
@@ -82,13 +80,10 @@ const SandboxManager = ({ onEnvironmentSelect, selectedEnvironment }) => {
         if (!confirm('Are you sure you want to delete this environment?')) return
 
         try {
-            console.log('Attempting to delete environment:', id)
-            const response = await fetch(`http://localhost:8080/api/sandbox/environments/${id}`, {
-                method: 'DELETE',
-                credentials: 'include'
+            // FIXED: Use API_ENDPOINTS pattern for delete endpoint
+            const response = await apiRequest(`${API_ENDPOINTS.sandbox.environments}/${id}`, {
+                method: 'DELETE'
             })
-
-            console.log('Delete response status:', response.status)
             
             if (!response.ok) {
                 const errorData = await response.json()

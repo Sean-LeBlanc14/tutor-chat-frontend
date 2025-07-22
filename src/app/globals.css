@@ -166,7 +166,8 @@ body, html {
   justify-content: flex-end;
 }
 
-.chat-bubble-wrapper.bot {
+.chat-bubble-wrapper.bot,
+.chat-bubble-wrapper.assistant {
   justify-content: flex-start;
 }
 
@@ -193,7 +194,8 @@ body, html {
   border-bottom-right-radius: 6px;
 }
 
-.chat-message.bot {
+.chat-message.bot,
+.chat-message.assistant {
   background-color: var(--color-bg-secondary);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);

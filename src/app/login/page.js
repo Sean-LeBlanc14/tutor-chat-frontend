@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/lib/authContext'
 import './login-page.styles.css'
@@ -12,22 +12,28 @@ const LoginPage = () => {
     const [courseCode, setCourseCode] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+
     const router = useRouter()
-    const { login } = useAuth()
+    const { login, user, loading: authLoading } = useAuth()
+
+    // ✅ Redirect away from /login if already authenticated
+    useEffect(() => {
+        if (!authLoading && user) {
+            router.push('/') // or your dashboard/home page
+        }
+    }, [authLoading, user, router])
 
     const handleSubmit = async (event) => {
         event.preventDefault()
         setLoading(true)
         setError('')
 
-        // Basic email validation (backend will handle @csub.edu validation)
         if (!email) {
             setError('Email is required')
             setLoading(false)
             return
         }
 
-        // Basic course code validation (backend will handle specific validation)
         if (!courseCode.trim()) {
             setError('Course code is required')
             setLoading(false)
@@ -35,9 +41,7 @@ const LoginPage = () => {
         }
 
         try {
-            // Use the login function from auth context with course code
             const result = await login(email, password, courseCode.trim())
-            
             if (result.success) {
                 router.push('/')
             } else {

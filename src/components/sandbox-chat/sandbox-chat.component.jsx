@@ -1,3 +1,4 @@
+// Fixed sandbox-chat.component.jsx with proper backend API calls
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -8,6 +9,8 @@ import SearchBox from '../search-box/search-box.component'
 import Spinner from '../spinner/spinner.component'
 import SandboxManager from '../sandbox-manager/sandbox-manager.component'
 import Sidebar from '../sidebar/sidebar.component'
+import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
+import { sanitizeInput, validateInput } from '@/app/utils/security'
 
 const SandBoxChat = () => {
     const { user } = useAuth()
@@ -40,10 +43,7 @@ const SandBoxChat = () => {
 
     const loadSandboxChats = async () => {
         try {
-            const response = await fetch(`http://localhost:8080/api/sandbox/sessions/${selectedEnv.id}`, {
-                method: 'GET',
-                credentials: 'include'
-            })
+            const response = await apiRequest(API_ENDPOINTS.sandbox.sessions(selectedEnv.id))
 
             if (!response.ok) {
                 throw new Error('Failed to load sandbox sessions')
@@ -68,10 +68,8 @@ const SandBoxChat = () => {
         if (!selectedEnv || !user) return
 
         try {
-            const response = await fetch('http://localhost:8080/api/sandbox/sessions', {
+            const response = await apiRequest(API_ENDPOINTS.sandbox.createSession, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({
                     environment_id: selectedEnv.id,
                     session_name: `Session ${new Date().toLocaleString()}`
@@ -98,7 +96,7 @@ const SandBoxChat = () => {
 
         } catch (error) {
             console.error('Error creating new chat:', error)
-            // Fallback to local chat creation if API fails
+            // Fallback to local chat creation
             const newChat = {
                 id: crypto.randomUUID(),
                 title: `Session ${new Date().toLocaleString()}`,
@@ -111,71 +109,105 @@ const SandBoxChat = () => {
         }
     }
 
-    const handleInputChange = (e) => setQuery(e.target.value)
+    const handleInputChange = (e) => {
+        setQuery(e.target.value)
+    }
 
+    // FIXED: Use API_ENDPOINTS instead of hardcoded URL
     const addMessageToActive = async (role, content) => {
+
+        // Check if we have an active chat session
+        if (!activeChatId) {
+            console.error('No active chat session. Cannot save message.');
+            return;
+        }
+
+        // Add message to local state immediately for better UX
         const newMessage = {
             id: crypto.randomUUID(),
             role,
-            content
-        }
+            content,
+            created_at: new Date().toISOString()
+        };
 
-        // Update local state immediately for responsive UI
+        // Update local messages
         setChatLogs(prev =>
-            prev.map(chat => {
-                if (chat.id !== activeChatId) return chat
+            prev.map(chat =>
+                chat.id === activeChatId
+                    ? { ...chat, messages: [...chat.messages, newMessage] }
+                    : chat
+            )
+        );
 
-                const newMessages = [...chat.messages, newMessage]
-                let title = chat.title
-
-                // Only set title if it's empty AND this is the first user message
-                if (!title && role === 'user' && chat.messages.length === 0) {
-                    const trimmed = content.trim()
-                    title = trimmed.slice(0, 30).replace(/[.!?]*$/, '')
-                    title = title.charAt(0).toUpperCase() + title.slice(1)
-                }
-
-                return { ...chat, title, messages: newMessages }
-            })
-        )
-
-        // Save to backend
-        if (user && activeChatId) {
-            try {
-                const response = await fetch(`http://localhost:8080/api/sandbox/sessions/${activeChatId}/messages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        role,
-                        content
-                    })
+        // FIXED: Use apiRequest with proper backend URL
+        try {
+            const response = await apiRequest(API_ENDPOINTS.sandbox.sessionMessages(activeChatId), {
+                method: 'POST',
+                body: JSON.stringify({
+                    role: role,
+                    content: content
                 })
-
-                if (!response.ok) {
-                    console.error('Failed to save message to backend')
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                
+                // Update the message with the server-generated ID if needed
+                setChatLogs(prev =>
+                    prev.map(chat =>
+                        chat.id === activeChatId
+                            ? {
+                                ...chat,
+                                messages: chat.messages.map(msg =>
+                                    msg.id === newMessage.id ? { ...msg, id: result.id } : msg
+                                )
+                            }
+                            : chat
+                    )
+                );
+            } else {
+                const errorData = await response.text();
+                console.error('Backend error response:', errorData);
+                
+                try {
+                    const jsonError = JSON.parse(errorData);
+                    console.error('Parsed error:', jsonError);
+                    
+                    // Handle specific errors
+                    if (jsonError.detail === 'Session not found') {
+                        await startNewChat();
+                    }
+                } catch (e) {
+                    console.error('Raw error text:', errorData);
                 }
-            } catch (error) {
-                console.error('Error saving sandbox message:', error)
             }
+            
+        } catch (error) {
+            console.error('Network error saving message:', error);
+            console.error('Error type:', error.constructor.name);
+            console.error('Error message:', error.message);
         }
     }
 
     const handleRenameSession = async (sessionId, newTitle) => {
+        const sanitizedTitle = sanitizeInput(newTitle)
+        if (!validateInput(sanitizedTitle, 100)) {
+            alert('Title is invalid or too long')
+            return
+        }
+
         // Update local state immediately
         setChatLogs(prev =>
             prev.map(chat =>
-                chat.id === sessionId ? { ...chat, title: newTitle } : chat
+                chat.id === sessionId ? { ...chat, title: sanitizedTitle } : chat
             )
         )
 
-        // Update backend
+        // FIXED: Use proper endpoint for updating session
         try {
-            const response = await fetch(`http://localhost:8080/api/sandbox/sessions/${sessionId}`, {
+            const response = await apiRequest(`${API_ENDPOINTS.sandbox.createSession}/${sessionId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ session_name: newTitle })
+                body: JSON.stringify({ session_name: sanitizedTitle })
             })
 
             if (!response.ok) {
@@ -202,11 +234,10 @@ const SandBoxChat = () => {
 
         setChatLogs(updated)
 
-        // Delete from backend
+        // FIXED: Use proper endpoint for deleting session
         try {
-            const response = await fetch(`http://localhost:8080/api/sandbox/sessions/${sessionId}`, {
-                method: 'DELETE',
-                credentials: 'include'
+            const response = await apiRequest(`${API_ENDPOINTS.sandbox.createSession}/${sessionId}`, {
+                method: 'DELETE'
             })
 
             if (!response.ok) {
@@ -221,32 +252,48 @@ const SandBoxChat = () => {
         e.preventDefault()
         if (!query.trim()) return
 
-        const userQuery = query
-        addMessageToActive('user', userQuery)
+        const userQuery = sanitizeInput(query.trim())
+        
+        if (!validateInput(userQuery, 5000)) {
+            alert('Message is too long or contains invalid characters')
+            return
+        }
+
+        await addMessageToActive('user', userQuery)
         setLoading(true)
         setDisplayedText('')
         setHasAsked(true)
         setQuery('')
 
         try {
-            // Use the updated chat endpoint with sandbox environment prompt
+            // Enhanced payload with chat context for sandbox
             const payload = {
                 question: userQuery,
                 system_prompt: selectedEnv.system_prompt,
-                temperature: selectedEnv.model_config?.temperature || 0.7
+                temperature: selectedEnv.model_config?.temperature || 0.7,
+                chat_id: activeChatId // Add chat context for memory
             }
 
-            const res = await fetch('http://localhost:8080/api/chat', {
+            const response = await apiRequest(API_ENDPOINTS.chat.base, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
 
-            const data = await res.json()
-            addMessageToActive('bot', data.response)
+            if (!response.ok) {
+                throw new Error('Failed to get response')
+            }
+
+            const data = await response.json()
+            await addMessageToActive('assistant', data.response)
         } catch (error) {
             console.error('Error:', error)
-            addMessageToActive('bot', 'Something went wrong.')
+            let errorMessage = 'Something went wrong.'
+            
+            if (error.message.includes('Too many requests')) {
+                errorMessage = 'Too many requests. Please wait a moment and try again.'
+            }
+            
+            await addMessageToActive('assistant', errorMessage)
         } finally {
             setLoading(false)
         }
@@ -255,23 +302,28 @@ const SandBoxChat = () => {
     useEffect(() => {
         if (!loading && messages.length > 0) {
             const last = messages[messages.length - 1]
-            if (last.role !== 'bot') return
+            if (last.role !== 'assistant') return
 
             const fullText = last.content
             let currentText = ''
             setDisplayedText('')
 
+            const baseSpeed = fullText.length > 500 ? 3 : 5
+            let charIndex = 0
+
             const interval = setInterval(() => {
-                currentText = fullText.slice(0, currentText.length + 1)
+                charIndex += baseSpeed
+                currentText = fullText.slice(0, charIndex)
                 setDisplayedText(currentText)
 
-                if (currentText.length >= fullText.length) {
+                if (charIndex >= fullText.length) {
                     clearInterval(interval)
+                    setDisplayedText(fullText)
                     if (chatHistoryRef.current) {
-                        chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+                        chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHistory
                     }
                 }
-            }, 5)
+            }, 20)
 
             return () => clearInterval(interval)
         }
@@ -283,7 +335,7 @@ const SandBoxChat = () => {
         <div className="app-layout">
             {selectedEnv && (
                 <Sidebar
-                    chatLogs={chatLogs} // here these are sandbox sessions
+                    chatLogs={chatLogs}
                     activeChatId={activeChatId}
                     onNewChat={startNewChat}
                     onSelectChat={(sessionId) => {
@@ -311,7 +363,6 @@ const SandBoxChat = () => {
                         ← Back to Environments
                     </button>
                     
-                    {/* Show current environment details */}
                     <div className="environment-info-card">
                         <h3 className="environment-info-title">Testing Environment: {selectedEnv.name}</h3>
                         {selectedEnv.description && (
@@ -329,8 +380,8 @@ const SandBoxChat = () => {
 
                     {chatLogs.length === 0 ? (
                         <div className="empty-state">
-                            <h1>No Chats Yet</h1>
-                            <p>Start a new chat to test this environment.</p>
+                            <h1>No Test Sessions Yet</h1>
+                            <p>Start a new test session to try this environment.</p>
                         </div>
                     ) : !hasAsked && (
                         <>
@@ -345,10 +396,10 @@ const SandBoxChat = () => {
                                 <div key={index} className="chat-line">
                                     <div className={`chat-bubble-wrapper ${msg.role}`}>
                                         <div className={`chat-message ${msg.role}`}>
-                                            {msg.role === 'bot' && index === messages.length - 1 && !loading ? (
+                                            {msg.role === 'assistant' && index === messages.length - 1 && !loading ? (
                                                 <>
                                                     {displayedText}
-                                                    <span className="blinking-cursor">|</span>
+                                                    <span className="blinking-cursor"></span>
                                                 </>
                                             ) : msg.content}
                                         </div>
@@ -357,7 +408,7 @@ const SandBoxChat = () => {
                             ))}
                             {loading && (
                                 <div className="chat-line">
-                                    <div className="chat-bubble-wrapper bot">
+                                    <div className="chat-bubble-wrapper assistant">
                                         <div className="spinner-container">
                                             <Spinner />
                                         </div>
@@ -374,7 +425,10 @@ const SandBoxChat = () => {
                                 onChange={handleInputChange}
                                 onSubmit={handleFormSubmit}
                                 className="chat-box"
-                                placeholder="Test your custom prompt..."
+                                placeholder={messages.length > 0 ? 
+                                    "Ask a follow-up question or test something new..." : 
+                                    "Test your custom prompt..."
+                                }
                             />
                         </div>
                     )}

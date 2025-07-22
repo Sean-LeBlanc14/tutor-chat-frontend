@@ -221,6 +221,21 @@
     color: #9ca3af;
 }
 
+.from-textarea::-webkit-scrollbar {
+    width: 14px;
+}
+
+.from-textarea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.from-textarea::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
 .form-actions {
     display: flex;
     gap: 1rem;

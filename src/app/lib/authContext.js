@@ -1,6 +1,9 @@
+// Updated authContext.js with security improvements and fixed infinite loop
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { API_ENDPOINTS, apiRequest } from "@/app/utils/api"
+import { sanitizeInput, validateInput } from '@/app/utils/security'
 
 const AuthContext = createContext()
 
@@ -15,23 +18,27 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [hasCheckedAuth, setHasCheckedAuth] = useState(false) // Prevent multiple checks
 
-    // Check if user is already logged in
-    useEffect(() => {
-        checkAuth()
-    }, [])
+    const checkAuth = useCallback(async () => {
+        // Prevent multiple simultaneous auth checks
+        if (hasCheckedAuth && !loading) {
+            return
+        }
 
-    const checkAuth = async () => {
         try {
-            const response = await fetch('http://localhost:8080/api/me', {
-                method: 'GET',
-                credentials: 'include'
-            })
+            setLoading(true)
+            const response = await apiRequest(API_ENDPOINTS.auth.me)
 
             if (response.ok) {
                 const userData = await response.json()
                 setUser(userData)
+            } else if (response.status === 401) {
+                // Handle 401 gracefully - user is not authenticated
+                setUser(null)
             } else {
+                // Other errors
+                console.error('Auth check failed with status:', response.status)
                 setUser(null)
             }
         } catch (error) {
@@ -39,58 +46,49 @@ export const AuthProvider = ({ children }) => {
             setUser(null)
         } finally {
             setLoading(false)
+            setHasCheckedAuth(true) // Mark as checked to prevent infinite loops
         }
-    }
+    }, [hasCheckedAuth, loading])
+
+    useEffect(() => {
+        if (!hasCheckedAuth) {
+            checkAuth()
+        }
+    }, [hasCheckedAuth, checkAuth])
 
     const login = async (email, password, courseCode) => {
         try {
-            console.log('Login attempt with:', { email, courseCode: courseCode ? 'provided' : 'missing' })
+            // Input validation and sanitization
+            const sanitizedEmail = sanitizeInput(email?.trim())
+            const sanitizedCourseCode = sanitizeInput(courseCode?.trim())
             
-            const requestBody = {
-                email: email.trim(),
-                password,
-                course_code: courseCode.trim()
-            }
-            
-            console.log('Request body:', requestBody)
-            
-            const response = await fetch('http://localhost:8080/api/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-                body: JSON.stringify(requestBody)
-            })
-
-            console.log('Response status:', response.status)
-            
-            if (!response.ok) {
-                const error = await response.json()
-                console.log('Backend error response:', error)
-                
-                // Extract error message safely
-                let errorMessage = 'Login failed'
-                if (typeof error === 'string') {
-                    errorMessage = error
-                } else if (error && typeof error === 'object') {
-                    if (typeof error.detail === 'string') {
-                        errorMessage = error.detail
-                    } else if (Array.isArray(error.detail)) {
-                        errorMessage = error.detail[0]?.msg || 'Validation error'
-                    } else if (error.message) {
-                        errorMessage = error.message
-                    }
-                }
-                
+            if (!validateInput(sanitizedEmail, 254) || !validateInput(password, 128) || !validateInput(sanitizedCourseCode, 50)) {
                 return {
                     success: false,
-                    error: String(errorMessage) // Ensure it's always a string
+                    error: 'Invalid input provided'
+                }
+            }
+
+            const response = await apiRequest(API_ENDPOINTS.auth.login, {
+                method: 'POST',
+                body: JSON.stringify({
+                    email: sanitizedEmail,
+                    password,
+                    course_code: sanitizedCourseCode
+                })
+            })
+
+            if (!response.ok) {
+                const error = await response.json()
+                return {
+                    success: false,
+                    error: error.detail || 'Login failed'
                 }
             }
 
             const data = await response.json()
             setUser(data.user)
+            setHasCheckedAuth(true) // Mark as authenticated
             
             return {
                 success: true,
@@ -101,53 +99,45 @@ export const AuthProvider = ({ children }) => {
             console.error('Login error:', error)
             return {
                 success: false,
-                error: 'Network error. Please try again.'
+                error: error.message || 'Network error. Please try again.'
             }
         }
     }
 
     const signup = async (email, password, userRole = 'student', courseCode) => {
         try {
-            const response = await fetch('http://localhost:8080/api/signup', {
+            // Input validation and sanitization
+            const sanitizedEmail = sanitizeInput(email?.trim())
+            const sanitizedCourseCode = sanitizeInput(courseCode?.trim())
+            
+            if (!validateInput(sanitizedEmail, 254) || !validateInput(password, 128) || !validateInput(sanitizedCourseCode, 50)) {
+                return {
+                    success: false,
+                    error: 'Invalid input provided'
+                }
+            }
+
+            const response = await apiRequest(API_ENDPOINTS.auth.signup, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
                 body: JSON.stringify({
-                    email,
+                    email: sanitizedEmail,
                     password,
                     user_role: userRole,
-                    course_code: courseCode // Include course code in request
+                    course_code: sanitizedCourseCode
                 })
             })
 
             if (!response.ok) {
                 const error = await response.json()
-                console.log('Backend signup error response:', error)
-                
-                // Extract error message safely
-                let errorMessage = 'Signup failed'
-                if (typeof error === 'string') {
-                    errorMessage = error
-                } else if (error && typeof error === 'object') {
-                    if (typeof error.detail === 'string') {
-                        errorMessage = error.detail
-                    } else if (Array.isArray(error.detail)) {
-                        errorMessage = error.detail[0]?.msg || 'Validation error'
-                    } else if (error.message) {
-                        errorMessage = error.message
-                    }
-                }
-                
                 return {
                     success: false,
-                    error: String(errorMessage) // Ensure it's always a string
+                    error: error.detail || 'Signup failed'
                 }
             }
 
             const data = await response.json()
             setUser(data.user)
+            setHasCheckedAuth(true) // Mark as authenticated
             
             return {
                 success: true,
@@ -158,32 +148,25 @@ export const AuthProvider = ({ children }) => {
             console.error('Signup error:', error)
             return {
                 success: false,
-                error: 'Network error. Please try again.'
+                error: error.message || 'Network error. Please try again.'
             }
         }
     }
 
     const logout = async () => {
         try {
-            const response = await fetch('http://localhost:8080/api/logout', {
-                method: 'POST',
-                credentials: 'include'
+            const response = await apiRequest(API_ENDPOINTS.auth.logout, {
+                method: 'POST'
             })
 
-            if (response.ok) {
-                setUser(null)
-                return { success: true }
-            } else {
-                throw new Error('Logout failed')
-            }
+            setUser(null)
+            setHasCheckedAuth(true) // Keep as checked but with no user
+            return { success: true }
         } catch (error) {
             console.error('Logout error:', error)
-            // Even if logout fails on server, clear user locally
             setUser(null)
-            return { 
-                success: false, 
-                error: 'Logout may have failed on server, but you have been logged out locally' 
-            }
+            setHasCheckedAuth(true)
+            return { success: false, error: 'Logout may have failed on server' }
         }
     }
 

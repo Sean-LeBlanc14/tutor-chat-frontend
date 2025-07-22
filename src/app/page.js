@@ -1,3 +1,4 @@
+// Fixed page.js with correct chat creation
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,6 +7,8 @@ import { useRole } from '@/hooks/useRole'
 import SearchBox from '@/components/search-box/search-box.component'
 import Spinner from '@/components/spinner/spinner.component'
 import Sidebar from '@/components/sidebar/sidebar.component'
+import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
+import { sanitizeInput, validateInput } from '@/app/utils/security'
 
 const HomePage = () => {
   const { user } = useAuth()
@@ -18,7 +21,7 @@ const HomePage = () => {
   const [displayedText, setDisplayedText] = useState('')
   const [chatLogs, setChatLogs] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
-  const [chatsLoaded, setChatsLoaded] = useState(false) // Track if chats have been loaded
+  const [chatsLoaded, setChatsLoaded] = useState(false)
 
   const chatHistoryRef = useRef(null)
 
@@ -36,9 +39,8 @@ const HomePage = () => {
     setQuery(event.target.value)
   }
 
-  // Function to generate a chat title from the first message
+  // Enhanced title generation with better context awareness
   const generateChatTitle = (message) => {
-    // Clean the message and extract key parts
     let title = message.trim()
     
     // Remove common question words and clean up
@@ -51,13 +53,9 @@ const HomePage = () => {
       title = lastSpace > 15 ? truncated.substring(0, lastSpace) : truncated
     }
     
-    // Remove trailing punctuation
     title = title.replace(/[.!?]*$/, '')
-    
-    // Capitalize first letter
     title = title.charAt(0).toUpperCase() + title.slice(1)
     
-    // Fallback if title is too short or empty
     if (title.length < 3) {
       title = 'New Chat'
     }
@@ -67,9 +65,17 @@ const HomePage = () => {
   
   const handleFormSubmit = async (event) => {
     event.preventDefault()
-    if (query.trim() === '') return
+    if (!query.trim()) return
 
-    const userQuery = query
+    // Only sanitize when submitting, not during typing
+    const userQuery = sanitizeInput(query.trim())
+    
+    // Additional validation
+    if (!validateInput(userQuery, 5000)) {
+      alert('Message is too long or contains invalid characters')
+      return
+    }
+
     addMessageToActive('user', userQuery)
     setLoading(true)
     setDisplayedText('')
@@ -77,90 +83,91 @@ const HomePage = () => {
     setQuery('')
 
     try {
-      const res = await fetch('http://localhost:8080/api/chat', {
+      // Enhanced payload with chat context
+      const payload = {
+        question: userQuery,
+        chat_id: activeChatId, // Include chat ID for context
+        temperature: 0.7
+      }
+
+      const response = await apiRequest(API_ENDPOINTS.chat.base, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userQuery }),
+        body: JSON.stringify(payload)
       })
 
-      const data = await res.json()
-      addMessageToActive('bot', data.response)
+      if (!response.ok) {
+        throw new Error('Failed to get response')
+      }
+
+      const data = await response.json()
+      addMessageToActive('assistant', data.response)
     } catch (error) {
       console.error('Error:', error)
-      addMessageToActive('bot', 'Something went wrong.')
+      let errorMessage = 'Something went wrong.'
+      
+      if (error.message.includes('Too many requests')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.'
+      } else if (error.message.includes('Authentication')) {
+        errorMessage = 'Please log in again.'
+        router.push('/login')
+        return
+      }
+      
+      addMessageToActive('assistant', errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
+  // Enhanced typing effect with better performance
   useEffect(() => {
     if (!loading && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
-      if (lastMessage.role !== 'bot') return
+      if (lastMessage.role !== 'assistant') return
 
       const fullText = lastMessage.content
       let currentText = ''
       setDisplayedText('')
 
+      // Faster typing for longer responses
+      const baseSpeed = fullText.length > 500 ? 3 : 5
+      let charIndex = 0
+
       const interval = setInterval(() => {
-        currentText = fullText.slice(0, currentText.length + 1)
+        charIndex += baseSpeed
+        currentText = fullText.slice(0, charIndex)
         setDisplayedText(currentText)
 
-        if (currentText.length >= fullText.length) {
+        if (charIndex >= fullText.length) {
           clearInterval(interval)
+          setDisplayedText(fullText) // Ensure complete text is shown
 
           if (chatHistoryRef.current) {
             chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
           }
         }
-      }, 5)
+      }, 20) // Slightly faster interval
 
       return () => clearInterval(interval)
     }
   }, [loading, messages])
 
-  const startNewChat = useCallback(async () => {
+  // Create new chat locally - backend will handle it when first message is sent
+  const startNewChat = useCallback(() => {
     if (!user?.email) return
 
-    try {
-      const response = await fetch('http://localhost:8080/api/chats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ user_email: user.email })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create new chat')
-      }
-
-      const data = await response.json()
-      const newChatId = data.chat_id
-
-      const newChat = {
-        id: newChatId,
-        title: '',
-        messages: [],
-        created_at: new Date().toISOString()
-      }
-
-      setChatLogs(prev => [newChat, ...prev])
-      setActiveChatId(newChatId)
-      setHasAsked(false)
-
-    } catch (error) {
-      console.error('Error creating new chat:', error)
-
-      const newChat = {
-        id: crypto.randomUUID(),
-        title: '',
-        messages: [],
-        created_at: new Date().toISOString()
-      }
-      setChatLogs(prev => [newChat, ...prev])
-      setActiveChatId(newChat.id)
-      setHasAsked(false)
+    // Create new chat locally - backend will create it when first message is sent
+    const newChatId = crypto.randomUUID()
+    const newChat = {
+      id: newChatId,
+      title: '', // Will be auto-generated from first message
+      messages: [],
+      created_at: new Date().toISOString()
     }
+
+    setChatLogs(prev => [newChat, ...prev])
+    setActiveChatId(newChatId)
+    setHasAsked(false)
   }, [user?.email])
 
   const handleSelectChat = (chatId) => {
@@ -170,51 +177,64 @@ const HomePage = () => {
   }
 
   const addMessageToActive = async (role, content) => {
-      const newMessage = {
-          id: crypto.randomUUID(),
-          role,
-          content
-      }
+    // Create message with proper ID and timestamp
+    const newMessage = {
+      id: crypto.randomUUID(),
+      role,
+      content: sanitizeInput(content),
+      created_at: new Date().toISOString()
+    }
 
-      // Update local state immediately for responsive UI
-      setChatLogs(prev =>
-          prev.map(chat => {
-              if (chat.id !== activeChatId) return chat
+    // Find current chat and determine if this is the first user message
+    const currentChat = chatLogs.find(chat => chat.id === activeChatId)
+    const isFirstUserMessage = currentChat && role === 'user' && currentChat.messages.length === 0
+    
+    // Generate title for first user message
+    let newTitle = currentChat?.title || ''
+    if (isFirstUserMessage) {
+      newTitle = generateChatTitle(content)
+    }
 
-              const newMessages = [...chat.messages, newMessage]
-              let title = chat.title
-              
-              // Auto-generate title from first user message
-              if (!title && role === 'user' && chat.messages.length === 0) {
-                  title = generateChatTitle(content)
-              }
+    // Update local state immediately for responsive UI
+    setChatLogs(prev =>
+      prev.map(chat => {
+        if (chat.id !== activeChatId) return chat
 
-              return { ...chat, title, messages: newMessages }
-          })
-      )
+        const newMessages = [...chat.messages, newMessage]
+        
+        return { 
+          ...chat, 
+          title: isFirstUserMessage ? newTitle : chat.title,
+          messages: newMessages 
+        }
+      })
+    )
 
     // Save to backend
     if (user?.email && activeChatId) {
       try {
-        const response = await fetch(`http://localhost:8080/api/chats/${activeChatId}/messages`, {
+        
+        const response = await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({
             user_email: user.email,
             role,
-            content
+            content: newMessage.content
           })
         })
 
         if (!response.ok) {
-          console.error('Failed to save message to backend')
-        }
-
-        // Update title in backend if this is the first user message
-        const chat = chatLogs.find(c => c.id === activeChatId)
-        if (chat && chat.title && !chat.title.includes('New Chat') && role === 'user' && chat.messages.length === 1) {
-          await updateChatTitleInBackend(activeChatId, chat.title)
+          const errorText = await response.text()
+          console.error('Failed to save message to backend:', errorText)
+        } else {
+          
+          // Save title if this was the first user message
+          if (isFirstUserMessage && newTitle) {
+            const titleSaved = await updateChatTitleInBackend(activeChatId, newTitle)
+            if (!titleSaved) {
+              console.error('Failed to save chat title')
+            }
+          }
         }
 
       } catch (error) {
@@ -225,49 +245,20 @@ const HomePage = () => {
 
   const updateChatTitleInBackend = async (chatId, title) => {
     try {
-      console.log('Updating chat title:', { chatId, title }) // Debug log
-      
-      const response = await fetch(`http://localhost:8080/api/chats/${chatId}`, {
+      const response = await apiRequest(API_ENDPOINTS.chat.updateChat(chatId), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ 
-          title,
-          user_email: user?.email // Add user_email if backend requires it
+          title: sanitizeInput(title)
         })
       })
 
-      console.log('Update response status:', response.status) // Debug log
-
-      if (!response.ok) {
-        const errorData = await response.text()
-        console.error('Failed to update chat title - Response:', errorData)
+      if (response.ok) {
+        return true
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update chat title:', errorText)
         return false
       }
-
-      const responseData = await response.json()
-      console.log('Update successful - Backend response:', responseData) // Debug log
-      
-      // Force a refresh of chat data to verify the update persisted
-      setTimeout(() => {
-        console.log('Verifying title update...')
-        // Re-fetch the specific chat to verify it was updated
-        fetch(`http://localhost:8080/api/chats/${encodeURIComponent(user.email)}`, {
-          method: 'GET',
-          credentials: 'include'
-        })
-        .then(res => res.json())
-        .then(chats => {
-          const updatedChat = chats.find(c => c.id === chatId)
-          console.log('Chat after update:', updatedChat)
-          if (updatedChat && updatedChat.title !== title) {
-            console.error('Title update did not persist in database!')
-          }
-        })
-      }, 1000)
-      
-      return true
-
     } catch (error) {
       console.error('Error updating chat title:', error)
       return false
@@ -283,16 +274,10 @@ const HomePage = () => {
       }
 
       try {
-        console.log('Loading chats for user:', user.email) // Debug log
-        
-        const response = await fetch(`http://localhost:8080/api/chats/${encodeURIComponent(user.email)}`, {
-          method: 'GET',
-          credentials: 'include'
-        })
+        const response = await apiRequest(API_ENDPOINTS.chat.chats(user.email))
 
         if (!response.ok) {
           if (response.status === 401) {
-            // User not authenticated, redirect to login
             router.push('/login')
             return
           }
@@ -300,17 +285,21 @@ const HomePage = () => {
         }
 
         const chats = await response.json()
-        console.log('Loaded chats from backend:', chats) // Debug log - check if titles are correct here
         
-        setChatLogs(chats)
+        // Process chats to ensure proper structure
+        const processedChats = chats.map(chat => ({
+          ...chat,
+          title: chat.title || 'New Chat', // Fallback title
+          messages: chat.messages || []
+        }))
         
-        if (chats.length > 0) {
-          // Set the most recent chat as active
-          const mostRecentChat = chats[0]
+        setChatLogs(processedChats)
+        
+        if (processedChats.length > 0) {
+          const mostRecentChat = processedChats[0]
           setActiveChatId(mostRecentChat.id)
           setHasAsked(mostRecentChat.messages.length > 0)
         } else {
-          // No chats exist, we'll create one when needed
           setActiveChatId(null)
           setHasAsked(false)
         }
@@ -337,19 +326,24 @@ const HomePage = () => {
   }, [chatsLoaded, user?.email, chatLogs.length, startNewChat])
 
   const handleRenameChat = async (chatId, newTitle) => {
-    // Store original title for rollback if needed
+    const sanitizedTitle = sanitizeInput(newTitle)
+    if (!validateInput(sanitizedTitle, 100)) {
+      alert('Title is invalid or too long')
+      return
+    }
+
     const originalTitle = chatLogs.find(chat => chat.id === chatId)?.title
 
-    // Update local state immediately for responsive UI
+    // Update local state immediately
     setChatLogs(prev =>
       prev.map(chat =>
-        chat.id === chatId ? { ...chat, title: newTitle } : chat
+        chat.id === chatId ? { ...chat, title: sanitizedTitle } : chat
       )
     )
 
     // Update backend
     try {
-      const success = await updateChatTitleInBackend(chatId, newTitle)
+      const success = await updateChatTitleInBackend(chatId, sanitizedTitle)
       if (!success) {
         // Rollback on failure
         setChatLogs(prev =>
@@ -357,7 +351,6 @@ const HomePage = () => {
             chat.id === chatId ? { ...chat, title: originalTitle } : chat
           )
         )
-        console.error('Failed to update chat title, rolling back')
       }
     } catch (error) {
       // Rollback on error
@@ -366,7 +359,7 @@ const HomePage = () => {
           chat.id === chatId ? { ...chat, title: originalTitle } : chat
         )
       )
-      console.error('Error updating chat title, rolling back:', error)
+      console.error('Error updating chat title:', error)
     }
   }
 
@@ -391,9 +384,8 @@ const HomePage = () => {
     // Delete from backend
     if (user?.email) {
       try {
-        const response = await fetch(`http://localhost:8080/api/chats/${chatId}?user_email=${encodeURIComponent(user.email)}`, {
-          method: 'DELETE',
-          credentials: 'include'
+        const response = await apiRequest(API_ENDPOINTS.chat.deleteChat(chatId, user.email), {
+          method: 'DELETE'
         })
 
         if (!response.ok) {
@@ -453,10 +445,10 @@ const HomePage = () => {
               <div key={index} className='chat-line'>
                 <div className={`chat-bubble-wrapper ${msg.role}`}>
                   <div className={`chat-message ${msg.role}`}>
-                    {msg.role === 'bot' && index === messages.length - 1 && !loading ?
+                    {msg.role === 'assistant' && index === messages.length - 1 && !loading ?
                       <>
                         {displayedText}
-                        <span className="blinking-cursor">|</span>
+                        <span className="blinking-cursor"></span>
                       </>
                     : msg.content}
                   </div>
@@ -465,7 +457,7 @@ const HomePage = () => {
             ))}
             {loading && (
               <div className="chat-line">
-                <div className="chat-bubble-wrapper bot">
+                <div className="chat-bubble-wrapper assistant">
                   <div className="spinner-container">
                     <Spinner />
                   </div>
@@ -482,6 +474,10 @@ const HomePage = () => {
               onChange={handleInputChange}
               onSubmit={handleFormSubmit}
               className="chat-box"
+              placeholder={messages.length > 0 ? 
+                "Ask a follow-up question or something new..." : 
+                "Enter a psychology question"
+              }
             />
           </div>
         )}
