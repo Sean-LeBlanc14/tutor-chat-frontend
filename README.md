@@ -2,7 +2,6 @@ Psychology Tutor Chatbot - Frontend
 A modern web application built with Next.js that provides AI-powered psychology tutoring for university students. This project demonstrates full-stack development skills, secure authentication, and responsive UI design.
 🔗 Live Demo: View Application (will update with actual URL)
 🎯 Project Overview
-Built as part of my computer science coursework at California State University, Bakersfield, this application helps psychology students get personalized tutoring assistance through an intelligent chatbot interface.
 Key Features
 
 AI-Powered Conversations: Context-aware chat system with memory
