@@ -87,8 +87,24 @@ export const AuthProvider = ({ children }) => {
             }
 
             const data = await response.json()
-            setUser(data.user)
-            setHasCheckedAuth(true) // Mark as authenticated
+            
+            // ✅ FIXED: After successful login, fetch user details from /api/me
+            try {
+                const userResponse = await apiRequest(API_ENDPOINTS.auth.me)
+                if (userResponse.ok) {
+                    const userData = await userResponse.json()
+                    setUser(userData)
+                } else {
+                    // Fallback to data from login response if /api/me fails
+                    setUser(data.user)
+                }
+            } catch (error) {
+                console.error('Failed to fetch user details after login:', error)
+                // Fallback to data from login response
+                setUser(data.user)
+            }
+            
+            setHasCheckedAuth(true)
             
             return {
                 success: true,
