@@ -9,7 +9,6 @@ import Spinner from '@/components/spinner/spinner.component'
 import Sidebar from '@/components/sidebar/sidebar.component'
 import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
 import { sanitizeInput, validateInput } from '@/app/utils/security'
-import { flushSync } from 'react-dom'
 
 const HomePage = () => {
   const { user } = useAuth()
@@ -101,7 +100,7 @@ const HomePage = () => {
         throw new Error('Failed to get response')
       }
 
-      // REPLACE THIS PART - Handle streaming response instead of JSON
+      // Handle streaming response
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let fullResponse = ''
@@ -124,7 +123,10 @@ const HomePage = () => {
 
       setLoading(false) // Stop loading spinner, start streaming
 
-      // Read stream
+      // Read stream with throttled updates
+      let lastUpdateTime = 0
+      const UPDATE_INTERVAL = 16 // ~60fps
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -137,30 +139,48 @@ const HomePage = () => {
             const token = line.substring(6)
             fullResponse += token
 
-            flushSync(() => {
-              setChatLogs(prev => 
-              prev.map(chat => {
-                if (chat.id !== activeChatId) return chat
-                return {
-                  ...chat,
-                  messages: chat.messages.map(msg =>
-                    msg.id === assistantMessage.id
-                      ? { ...msg, content: fullResponse }
-                      : msg
-                  )
-                }
-              })
-            )
-            })
-            
+            // Throttle updates for smoother streaming
+            const now = Date.now()
+            if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+              setChatLogs(prev =>
+                prev.map(chat => {
+                  if (chat.id !== activeChatId) return chat
+                  return {
+                    ...chat,
+                    messages: chat.messages.map(msg =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, content: fullResponse }
+                        : msg
+                    )
+                  }
+                })
+              )
+              
+              lastUpdateTime = now
 
-            // Auto-scroll to bottom
-            if (chatHistoryRef.current) {
-              chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+              // Auto-scroll to bottom
+              if (chatHistoryRef.current) {
+                chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+              }
             }
           }
         }
       }
+
+      // Final update to ensure all content is shown
+      setChatLogs(prev =>
+        prev.map(chat => {
+          if (chat.id !== activeChatId) return chat
+          return {
+            ...chat,
+            messages: chat.messages.map(msg =>
+              msg.id === assistantMessage.id
+                ? { ...msg, content: fullResponse }
+                : msg
+            )
+          }
+        })
+      )
 
       // Save final assistant message to backend
       if (user?.email && activeChatId && fullResponse) {
@@ -195,41 +215,6 @@ const HomePage = () => {
       setLoading(false)
     }
   }
-
-  // Enhanced typing effect with better performance
-  /*
-  useEffect(() => {
-    if (!loading && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage.role !== 'assistant') return
-
-      const fullText = lastMessage.content
-      let currentText = ''
-      setDisplayedText('')
-
-      // Faster typing for longer responses
-      const baseSpeed = fullText.length > 500 ? 3 : 5
-      let charIndex = 0
-
-      const interval = setInterval(() => {
-        charIndex += baseSpeed
-        currentText = fullText.slice(0, charIndex)
-        setDisplayedText(currentText)
-
-        if (charIndex >= fullText.length) {
-          clearInterval(interval)
-          setDisplayedText(fullText) // Ensure complete text is shown
-
-          if (chatHistoryRef.current) {
-            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-          }
-        }
-      }, 20) // Slightly faster interval
-
-      return () => clearInterval(interval)
-    }
-  }, [loading, messages])
-  */
 
   // Create new chat locally - backend will handle it when first message is sent
   const startNewChat = useCallback(() => {
@@ -524,9 +509,7 @@ const HomePage = () => {
               <div key={index} className='chat-line'>
                 <div className={`chat-bubble-wrapper ${msg.role}`}>
                   <div className={`chat-message ${msg.role}`}>
-                    {msg.role === 'assistant' && index === messages.length - 1 && !loading ?
-                        msg.content  // Show the actual content, not displayedText
-                    : msg.content}
+                    {msg.content}
                   </div>
                 </div>
               </div>
