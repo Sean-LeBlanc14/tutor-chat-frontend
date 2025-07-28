@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
     },
     chat: {
         base: `${API_BASE_URL}/api/chat`,
+        stream: `${API_BASE_URL}/api/chat/stream`,
         chats: (userEmail) => `${API_BASE_URL}/api/chats/${userEmail}`,
         messages: (chatId) => `${API_BASE_URL}/api/chats/${chatId}/messages`,
         updateChat: (chatId) => `${API_BASE_URL}/api/chats/${chatId}`,
@@ -24,7 +25,7 @@ export const API_ENDPOINTS = {
     }
     };
 
-    export const apiRequest = async (url, options = {}) => {
+export const apiRequest = async (url, options = {}) => {
     const config = {
         headers: {
         'Content-Type': 'application/json',
@@ -35,8 +36,13 @@ export const API_ENDPOINTS = {
     };
 
     try {
-        
         const response = await fetch(url, config);
+        
+        // If this is a streaming request, return the response directly
+        // so the caller can handle the stream
+        if (options.stream) {
+            return response;
+        }
         
         return response;
     } catch (error) {

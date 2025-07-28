@@ -90,17 +90,91 @@ const HomePage = () => {
         temperature: 0.7
       }
 
-      const response = await apiRequest(API_ENDPOINTS.chat.base, {
+      const response = await apiRequest(API_ENDPOINTS.chat.stream, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        stream: true
       })
 
       if (!response.ok) {
         throw new Error('Failed to get response')
       }
 
-      const data = await response.json()
-      addMessageToActive('assistant', data.response)
+      // REPLACE THIS PART - Handle streaming response instead of JSON
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let fullResponse = ''
+
+      // Create assistant message that we'll update in real-time
+      const assistantMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString()
+      }
+
+      // Add empty assistant message to UI
+      setChatLogs(prev =>
+        prev.map(chat => {
+          if (chat.id !== activeChatId) return chat
+          return { ...chat, messages: [...chat.messages, assistantMessage] }
+        })
+      )
+
+      setLoading(false) // Stop loading spinner, start streaming
+
+      // Read stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const token = line.substring(6)
+            fullResponse += token
+
+            // Update assistant message in real-time
+            setChatLogs(prev =>
+              prev.map(chat => {
+                if (chat.id !== activeChatId) return chat
+                return {
+                  ...chat,
+                  messages: chat.messages.map(msg =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: fullResponse }
+                      : msg
+                  )
+                }
+              })
+            )
+
+            // Auto-scroll to bottom
+            if (chatHistoryRef.current) {
+              chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+            }
+          }
+        }
+      }
+
+      // Save final assistant message to backend
+      if (user?.email && activeChatId && fullResponse) {
+        try {
+          await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
+            method: 'POST',
+            body: JSON.stringify({
+              user_email: user.email,
+              role: 'assistant',
+              content: fullResponse
+            })
+          })
+        } catch (error) {
+          console.error('Error saving assistant message:', error)
+        }
+      }
+
     } catch (error) {
       console.error('Error:', error)
       let errorMessage = 'Something went wrong.'
@@ -120,6 +194,7 @@ const HomePage = () => {
   }
 
   // Enhanced typing effect with better performance
+  /*
   useEffect(() => {
     if (!loading && messages.length > 0) {
       const lastMessage = messages[messages.length - 1]
@@ -151,6 +226,7 @@ const HomePage = () => {
       return () => clearInterval(interval)
     }
   }, [loading, messages])
+  */
 
   // Create new chat locally - backend will handle it when first message is sent
   const startNewChat = useCallback(() => {

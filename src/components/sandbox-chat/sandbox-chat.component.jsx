@@ -274,17 +274,78 @@ const SandBoxChat = () => {
                 chat_id: activeChatId // Add chat context for memory
             }
 
-            const response = await apiRequest(API_ENDPOINTS.chat.base, {
+            const response = await apiRequest(API_ENDPOINTS.chat.stream, {
                 method: 'POST',
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                stream: true
             })
 
             if (!response.ok) {
                 throw new Error('Failed to get response')
             }
 
-            const data = await response.json()
-            await addMessageToActive('assistant', data.response)
+            // Handle streaming response
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let fullResponse = ''
+
+            // Create assistant message that we'll update in real-time
+            const assistantMessage = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: '',
+                created_at: new Date().toISOString()
+            }
+
+            // Add empty assistant message to UI
+            setChatLogs(prev =>
+                prev.map(chat => {
+                    if (chat.id !== activeChatId) return chat
+                    return { ...chat, messages: [...chat.messages, assistantMessage] }
+                })
+            )
+
+            setLoading(false) // Stop loading spinner, start streaming
+
+            // Read stream
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value)
+                const lines = chunk.split('\n')
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const token = line.substring(6)
+                        fullResponse += token
+
+                        // Update assistant message in real-time
+                        setChatLogs(prev =>
+                            prev.map(chat => {
+                                if (chat.id !== activeChatId) return chat
+                                return {
+                                    ...chat,
+                                    messages: chat.messages.map(msg =>
+                                        msg.id === assistantMessage.id
+                                            ? { ...msg, content: fullResponse }
+                                            : msg
+                                    )
+                                }
+                            })
+                        )
+
+                        // Auto-scroll to bottom
+                        if (chatHistoryRef.current) {
+                            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+                        }
+                    }
+                }
+            }
+
+            // If you have a function to save sandbox messages, add it here
+            // await saveSandboxMessage(assistantMessage)
+
         } catch (error) {
             console.error('Error:', error)
             let errorMessage = 'Something went wrong.'
@@ -299,6 +360,7 @@ const SandBoxChat = () => {
         }
     }
 
+    /*
     useEffect(() => {
         if (!loading && messages.length > 0) {
             const last = messages[messages.length - 1]
@@ -328,6 +390,7 @@ const SandBoxChat = () => {
             return () => clearInterval(interval)
         }
     }, [loading, messages])
+    */
 
     if (roleLoading || !isAdmin) return null
 
