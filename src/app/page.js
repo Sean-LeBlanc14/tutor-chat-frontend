@@ -150,8 +150,17 @@ const HomePage = () => {
               
               // DIRECT DOM UPDATE - bypasses React
               const messageElement = document.querySelector(`[data-message-id="${assistantMessage.id}"]`)
+              
+              // ADD THESE DEBUG LOGS:
+              console.log('Looking for element with ID:', assistantMessage.id)
+              console.log('Found element:', messageElement)
+              console.log('Current content in ref:', streamingContentRef.current)
+              
               if (messageElement) {
                 messageElement.textContent = streamingContentRef.current
+                console.log('Updated DOM element text to:', messageElement.textContent)
+              } else {
+                console.log('ERROR: Could not find message element!')
               }
               
               // Also update React state for consistency
