@@ -1,6 +1,6 @@
 // Fixed page.js with correct chat creation
 "use client"
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback as flushSync } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/lib/authContext'
 import { useRole } from '@/hooks/useRole'
@@ -24,6 +24,7 @@ const HomePage = () => {
   const [chatsLoaded, setChatsLoaded] = useState(false)
 
   const chatHistoryRef = useRef(null)
+  const streamingContentRef = useRef('')
 
   const activeChat = useMemo(() => 
     chatLogs.find(chat => chat.id === activeChatId), 
@@ -67,10 +68,8 @@ const HomePage = () => {
     event.preventDefault()
     if (!query.trim()) return
 
-    // Only sanitize when submitting, not during typing
     const userQuery = sanitizeInput(query.trim())
     
-    // Additional validation
     if (!validateInput(userQuery, 5000)) {
       alert('Message is too long or contains invalid characters')
       return
@@ -83,16 +82,19 @@ const HomePage = () => {
     setQuery('')
 
     try {
-      // Enhanced payload with chat context
       const payload = {
         question: userQuery,
-        chat_id: activeChatId, // Include chat ID for context
+        chat_id: activeChatId,
         temperature: 0.7
       }
 
       const response = await apiRequest(API_ENDPOINTS.chat.stream, {
         method: 'POST',
         body: JSON.stringify(payload),
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
         stream: true
       })
 
@@ -103,7 +105,9 @@ const HomePage = () => {
       // Handle streaming response
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
-      let fullResponse = ''
+      
+      // Reset streaming content ref
+      streamingContentRef.current = ''
 
       // Create assistant message that we'll update in real-time
       const assistantMessage = {
@@ -125,7 +129,7 @@ const HomePage = () => {
 
       // Read stream with throttled updates
       let lastUpdateTime = 0
-      const UPDATE_INTERVAL = 16 // ~60fps
+      const UPDATE_INTERVAL = 50 // Increased to 50ms for more reliable updates
 
       while (true) {
         const { done, value } = await reader.read()
@@ -137,60 +141,70 @@ const HomePage = () => {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
-            fullResponse += token
+            
+            // Debug log - remove this after testing
+            console.log('Received token:', token, 'at', new Date().toISOString())
+            
+            // Update ref immediately
+            streamingContentRef.current += token
 
-            // Throttle updates for smoother streaming
+            // Throttle UI updates but use ref content
             const now = Date.now()
             if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-              setChatLogs(prev =>
-                prev.map(chat => {
-                  if (chat.id !== activeChatId) return chat
-                  return {
-                    ...chat,
-                    messages: chat.messages.map(msg =>
-                      msg.id === assistantMessage.id
-                        ? { ...msg, content: fullResponse }
-                        : msg
-                    )
-                  }
+              // Use setTimeout to break out of React's batching
+              setTimeout(() => {
+                setChatLogs(prev => {
+                  return prev.map(chat => {
+                    if (chat.id !== activeChatId) return chat
+                    return {
+                      ...chat,
+                      messages: chat.messages.map(msg =>
+                        msg.id === assistantMessage.id
+                          ? { ...msg, content: streamingContentRef.current }
+                          : msg
+                      )
+                    }
+                  })
                 })
-              )
+                
+                // Auto-scroll to bottom
+                if (chatHistoryRef.current) {
+                  chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+                }
+              }, 0)
               
               lastUpdateTime = now
-
-              // Auto-scroll to bottom
-              if (chatHistoryRef.current) {
-                chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-              }
             }
           }
         }
       }
 
       // Final update to ensure all content is shown
-      setChatLogs(prev =>
-        prev.map(chat => {
-          if (chat.id !== activeChatId) return chat
-          return {
-            ...chat,
-            messages: chat.messages.map(msg =>
-              msg.id === assistantMessage.id
-                ? { ...msg, content: fullResponse }
-                : msg
-            )
-          }
-        })
-      )
+      setTimeout(() => {
+        setChatLogs(prev =>
+          prev.map(chat => {
+            if (chat.id !== activeChatId) return chat
+            return {
+              ...chat,
+              messages: chat.messages.map(msg =>
+                msg.id === assistantMessage.id
+                  ? { ...msg, content: streamingContentRef.current }
+                  : msg
+              )
+            }
+          })
+        )
+      }, 0)
 
       // Save final assistant message to backend
-      if (user?.email && activeChatId && fullResponse) {
+      if (user?.email && activeChatId && streamingContentRef.current) {
         try {
           await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
             method: 'POST',
             body: JSON.stringify({
               user_email: user.email,
               role: 'assistant',
-              content: fullResponse
+              content: streamingContentRef.current
             })
           })
         } catch (error) {
