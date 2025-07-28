@@ -1,6 +1,7 @@
-// Fixed page.js with correct chat creation
+// Fixed page.js with flushSync streaming
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/lib/authContext'
 import { useRole } from '@/hooks/useRole'
@@ -125,7 +126,7 @@ const HomePage = () => {
 
       // Read stream with throttled updates
       let lastUpdateTime = 0
-      const UPDATE_INTERVAL = 50 // Increased to 50ms for more reliable updates
+      const UPDATE_INTERVAL = 50
 
       while (true) {
         const { done, value } = await reader.read()
@@ -147,8 +148,8 @@ const HomePage = () => {
             // Throttle UI updates but use ref content
             const now = Date.now()
             if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-              // Use setTimeout to break out of React's batching
-              setTimeout(() => {
+              // Use flushSync to force immediate React update
+              flushSync(() => {
                 setChatLogs(prev => {
                   return prev.map(chat => {
                     if (chat.id !== activeChatId) return chat
@@ -162,12 +163,12 @@ const HomePage = () => {
                     }
                   })
                 })
-                
-                // Auto-scroll to bottom
-                if (chatHistoryRef.current) {
-                  chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-                }
-              }, 0)
+              })
+              
+              // Auto-scroll to bottom
+              if (chatHistoryRef.current) {
+                chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+              }
               
               lastUpdateTime = now
             }
@@ -176,7 +177,7 @@ const HomePage = () => {
       }
 
       // Final update to ensure all content is shown
-      setTimeout(() => {
+      flushSync(() => {
         setChatLogs(prev =>
           prev.map(chat => {
             if (chat.id !== activeChatId) return chat
@@ -190,7 +191,7 @@ const HomePage = () => {
             }
           })
         )
-      }, 0)
+      })
 
       // Save final assistant message to backend
       if (user?.email && activeChatId && streamingContentRef.current) {
