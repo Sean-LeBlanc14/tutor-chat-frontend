@@ -1,4 +1,4 @@
-// Fixed page.js with flushSync streaming
+// Fixed page.js with direct DOM streaming
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { flushSync } from 'react-dom'
@@ -139,16 +139,22 @@ const HomePage = () => {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
             
-            // Debug log - remove this after testing
+            // Debug log
             console.log('Received token:', token, 'at', new Date().toISOString())
             
             // Update ref immediately
             streamingContentRef.current += token
 
-            // Throttle UI updates but use ref content
             const now = Date.now()
             if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-              // Use flushSync to force immediate React update
+              
+              // DIRECT DOM UPDATE - bypasses React
+              const messageElement = document.querySelector(`[data-message-id="${assistantMessage.id}"]`)
+              if (messageElement) {
+                messageElement.textContent = streamingContentRef.current
+              }
+              
+              // Also update React state for consistency
               flushSync(() => {
                 setChatLogs(prev => {
                   return prev.map(chat => {
@@ -165,7 +171,7 @@ const HomePage = () => {
                 })
               })
               
-              // Auto-scroll to bottom
+              // Auto-scroll
               if (chatHistoryRef.current) {
                 chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
               }
@@ -519,7 +525,10 @@ const HomePage = () => {
             {messages.map((msg, index) => (
               <div key={index} className='chat-line'>
                 <div className={`chat-bubble-wrapper ${msg.role}`}>
-                  <div className={`chat-message ${msg.role}`}>
+                  <div 
+                    className={`chat-message ${msg.role}`}
+                    data-message-id={msg.id}
+                  >
                     {msg.content}
                   </div>
                 </div>
