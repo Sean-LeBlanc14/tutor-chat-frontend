@@ -9,6 +9,7 @@ import Spinner from '@/components/spinner/spinner.component'
 import Sidebar from '@/components/sidebar/sidebar.component'
 import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
 import { sanitizeInput, validateInput } from '@/app/utils/security'
+import { flushSync } from 'react-dom'
 
 const HomePage = () => {
   const { user } = useAuth()
@@ -134,13 +135,11 @@ const HomePage = () => {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
-            console.log('Received token:', token) // ADD THIS
             fullResponse += token
 
-            // Update assistant message in real-time
-            setChatLogs(prev => {
-              console.log('Updating with:', fullResponse) // ADD THIS
-              return prev.map(chat => {
+            flushSync(() => {
+              setChatLogs(prev => 
+              prev.map(chat => {
                 if (chat.id !== activeChatId) return chat
                 return {
                   ...chat,
@@ -150,8 +149,10 @@ const HomePage = () => {
                       : msg
                   )
                 }
-              })}
+              })
             )
+            })
+            
 
             // Auto-scroll to bottom
             if (chatHistoryRef.current) {
