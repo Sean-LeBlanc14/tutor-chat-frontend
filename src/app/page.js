@@ -1,7 +1,7 @@
 // Fixed page.js with direct DOM streaming
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { flushSync } from 'react-dom'
+import * as ReactDOM from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/lib/authContext'
 import { useRole } from '@/hooks/useRole'
@@ -146,19 +146,21 @@ const HomePage = () => {
             // Update ref immediately
             streamingContentRef.current += token
 
-            // Update React state immediately for every token
-            setChatLogs(prev => {
-              console.log(`Updating React state with: "${streamingContentRef.current}"`)
-              return prev.map(chat => {
-                if (chat.id !== activeChatId) return chat
-                return {
-                  ...chat,
-                  messages: chat.messages.map(msg =>
-                    msg.id === assistantMessage.id
-                      ? { ...msg, content: streamingContentRef.current }
-                      : msg
-                  )
-                }
+            // Force React to render each update immediately
+            ReactDOM.flushSync(() => {
+              setChatLogs(prev => {
+                console.log(`Updating React state with: "${streamingContentRef.current}"`)
+                return prev.map(chat => {
+                  if (chat.id !== activeChatId) return chat
+                  return {
+                    ...chat,
+                    messages: chat.messages.map(msg =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, content: streamingContentRef.current }
+                        : msg
+                    )
+                  }
+                })
               })
             })
 
