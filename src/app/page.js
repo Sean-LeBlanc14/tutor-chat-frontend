@@ -91,10 +91,6 @@ const HomePage = () => {
       const response = await apiRequest(API_ENDPOINTS.chat.stream, {
         method: 'POST',
         body: JSON.stringify(payload),
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
         stream: true
       })
 
