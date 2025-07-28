@@ -134,11 +134,13 @@ const HomePage = () => {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
+            console.log('Received token:', token) // ADD THIS
             fullResponse += token
 
             // Update assistant message in real-time
-            setChatLogs(prev =>
-              prev.map(chat => {
+            setChatLogs(prev => {
+              console.log('Updating with:', fullResponse) // ADD THIS
+              return prev.map(chat => {
                 if (chat.id !== activeChatId) return chat
                 return {
                   ...chat,
@@ -148,7 +150,7 @@ const HomePage = () => {
                       : msg
                   )
                 }
-              })
+              })}
             )
 
             // Auto-scroll to bottom
