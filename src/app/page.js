@@ -145,68 +145,43 @@ const HomePage = () => {
             // Update ref immediately
             streamingContentRef.current += token
 
-            // Update every token (no throttling for now)
-            // DIRECT DOM UPDATE - bypasses React
-            const messageElement = document.querySelector(`[data-message-id="${assistantMessage.id}"]`)
-            
-            // ADD THESE DEBUG LOGS:
-            console.log('Looking for element with ID:', assistantMessage.id)
-            console.log('Found element:', messageElement)
-            console.log('Current content in ref:', streamingContentRef.current)
-            
-            if (messageElement) {
-              messageElement.textContent = streamingContentRef.current
-              console.log('Updated DOM element text to:', messageElement.textContent)
-            } else {
-              console.log('ERROR: Could not find message element!')
-            }
-              
-              // Also update React state for consistency (throttled)
-              const now = Date.now()
-              if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-                flushSync(() => {
-                  setChatLogs(prev => {
-                    return prev.map(chat => {
-                      if (chat.id !== activeChatId) return chat
-                      return {
-                        ...chat,
-                        messages: chat.messages.map(msg =>
-                          msg.id === assistantMessage.id
-                            ? { ...msg, content: streamingContentRef.current }
-                            : msg
-                        )
-                      }
-                    })
-                  })
-                })
-                
-                // Auto-scroll
-                if (chatHistoryRef.current) {
-                  chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+            // Update React state immediately for every token
+            setChatLogs(prev => {
+              return prev.map(chat => {
+                if (chat.id !== activeChatId) return chat
+                return {
+                  ...chat,
+                  messages: chat.messages.map(msg =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: streamingContentRef.current }
+                      : msg
+                  )
                 }
-                
-                lastUpdateTime = now
-              }
+              })
+            })
+
+            // Auto-scroll
+            if (chatHistoryRef.current) {
+              chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+            }
           }
         }
       }
 
       // Final update to ensure all content is shown
-      flushSync(() => {
-        setChatLogs(prev =>
-          prev.map(chat => {
-            if (chat.id !== activeChatId) return chat
-            return {
-              ...chat,
-              messages: chat.messages.map(msg =>
-                msg.id === assistantMessage.id
-                  ? { ...msg, content: streamingContentRef.current }
-                  : msg
-              )
-            }
-          })
-        )
-      })
+      setChatLogs(prev =>
+        prev.map(chat => {
+          if (chat.id !== activeChatId) return chat
+          return {
+            ...chat,
+            messages: chat.messages.map(msg =>
+              msg.id === assistantMessage.id
+                ? { ...msg, content: streamingContentRef.current }
+                : msg
+            )
+          }
+        })
+      )
 
       // Save final assistant message to backend
       if (user?.email && activeChatId && streamingContentRef.current) {
@@ -536,7 +511,6 @@ const HomePage = () => {
                 <div className={`chat-bubble-wrapper ${msg.role}`}>
                   <div 
                     className={`chat-message ${msg.role}`}
-                    data-message-id={msg.id}
                   >
                     {msg.content}
                   </div>
