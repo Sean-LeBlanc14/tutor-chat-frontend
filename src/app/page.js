@@ -1,6 +1,6 @@
 // Fixed page.js with correct chat creation
 "use client"
-import { useState, useEffect, useRef, useMemo, useCallback as flushSync } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/lib/authContext'
 import { useRole } from '@/hooks/useRole'
