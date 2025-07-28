@@ -522,10 +522,7 @@ const HomePage = () => {
                 <div className={`chat-bubble-wrapper ${msg.role}`}>
                   <div className={`chat-message ${msg.role}`}>
                     {msg.role === 'assistant' && index === messages.length - 1 && !loading ?
-                      <>
-                        {displayedText}
-                        <span className="blinking-cursor"></span>
-                      </>
+                        msg.content  // Show the actual content, not displayedText
                     : msg.content}
                   </div>
                 </div>
