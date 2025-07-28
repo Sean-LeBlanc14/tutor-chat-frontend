@@ -139,14 +139,16 @@ const HomePage = () => {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
             
-            // Debug log
-            console.log('Received token:', token, 'at', new Date().toISOString())
+            // More precise timing debug
+            const now = performance.now()
+            console.log(`Token "${token}" received at ${now}ms`)
             
             // Update ref immediately
             streamingContentRef.current += token
 
             // Update React state immediately for every token
             setChatLogs(prev => {
+              console.log(`Updating React state with: "${streamingContentRef.current}"`)
               return prev.map(chat => {
                 if (chat.id !== activeChatId) return chat
                 return {
