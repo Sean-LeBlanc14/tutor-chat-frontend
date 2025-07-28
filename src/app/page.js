@@ -126,7 +126,7 @@ const HomePage = () => {
 
       // Read stream with throttled updates
       let lastUpdateTime = 0
-      const UPDATE_INTERVAL = 50
+      const UPDATE_INTERVAL = 10  // Reduced from 50ms to 10ms
 
       while (true) {
         const { done, value } = await reader.read()
@@ -145,48 +145,48 @@ const HomePage = () => {
             // Update ref immediately
             streamingContentRef.current += token
 
-            const now = Date.now()
-            if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+            // Update every token (no throttling for now)
+            // DIRECT DOM UPDATE - bypasses React
+            const messageElement = document.querySelector(`[data-message-id="${assistantMessage.id}"]`)
+            
+            // ADD THESE DEBUG LOGS:
+            console.log('Looking for element with ID:', assistantMessage.id)
+            console.log('Found element:', messageElement)
+            console.log('Current content in ref:', streamingContentRef.current)
+            
+            if (messageElement) {
+              messageElement.textContent = streamingContentRef.current
+              console.log('Updated DOM element text to:', messageElement.textContent)
+            } else {
+              console.log('ERROR: Could not find message element!')
+            }
               
-              // DIRECT DOM UPDATE - bypasses React
-              const messageElement = document.querySelector(`[data-message-id="${assistantMessage.id}"]`)
-              
-              // ADD THESE DEBUG LOGS:
-              console.log('Looking for element with ID:', assistantMessage.id)
-              console.log('Found element:', messageElement)
-              console.log('Current content in ref:', streamingContentRef.current)
-              
-              if (messageElement) {
-                messageElement.textContent = streamingContentRef.current
-                console.log('Updated DOM element text to:', messageElement.textContent)
-              } else {
-                console.log('ERROR: Could not find message element!')
-              }
-              
-              // Also update React state for consistency
-              flushSync(() => {
-                setChatLogs(prev => {
-                  return prev.map(chat => {
-                    if (chat.id !== activeChatId) return chat
-                    return {
-                      ...chat,
-                      messages: chat.messages.map(msg =>
-                        msg.id === assistantMessage.id
-                          ? { ...msg, content: streamingContentRef.current }
-                          : msg
-                      )
-                    }
+              // Also update React state for consistency (throttled)
+              const now = Date.now()
+              if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+                flushSync(() => {
+                  setChatLogs(prev => {
+                    return prev.map(chat => {
+                      if (chat.id !== activeChatId) return chat
+                      return {
+                        ...chat,
+                        messages: chat.messages.map(msg =>
+                          msg.id === assistantMessage.id
+                            ? { ...msg, content: streamingContentRef.current }
+                            : msg
+                        )
+                      }
+                    })
                   })
                 })
-              })
-              
-              // Auto-scroll
-              if (chatHistoryRef.current) {
-                chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+                
+                // Auto-scroll
+                if (chatHistoryRef.current) {
+                  chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+                }
+                
+                lastUpdateTime = now
               }
-              
-              lastUpdateTime = now
-            }
           }
         }
       }
