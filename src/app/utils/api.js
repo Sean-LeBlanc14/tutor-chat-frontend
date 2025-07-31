@@ -21,9 +21,12 @@ export const API_ENDPOINTS = {
         createEnvironment: `${API_BASE_URL}/api/sandbox/environments`,
         sessions: (envId) => `${API_BASE_URL}/api/sandbox/sessions/${envId}`,
         createSession: `${API_BASE_URL}/api/sandbox/sessions`,
-        sessionMessages: (sessionId) => `${API_BASE_URL}/api/sandbox/sessions/${sessionId}/messages` // Added missing endpoint
+        sessionMessages: (sessionId) => `${API_BASE_URL}/api/sandbox/sessions/${sessionId}/messages`,
+        chatStream: (sessionId) => `${API_BASE_URL}/api/sandbox/${sessionId}/chat/stream`, // Added sandbox streaming endpoint
+        updateSession: (sessionId) => `${API_BASE_URL}/api/sandbox/sessions/${sessionId}`,
+        deleteSession: (sessionId) => `${API_BASE_URL}/api/sandbox/sessions/${sessionId}`
     }
-    };
+};
 
 export const apiRequest = async (url, options = {}) => {
     const config = {

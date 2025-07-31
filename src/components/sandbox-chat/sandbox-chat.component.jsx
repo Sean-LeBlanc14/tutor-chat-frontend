@@ -205,7 +205,7 @@ const SandBoxChat = () => {
 
         // FIXED: Use proper endpoint for updating session
         try {
-            const response = await apiRequest(`${API_ENDPOINTS.sandbox.createSession}/${sessionId}`, {
+            const response = await apiRequest(API_ENDPOINTS.sandbox.updateSession(sessionId), {
                 method: 'PUT',
                 body: JSON.stringify({ session_name: sanitizedTitle })
             })
@@ -236,7 +236,7 @@ const SandBoxChat = () => {
 
         // FIXED: Use proper endpoint for deleting session
         try {
-            const response = await apiRequest(`${API_ENDPOINTS.sandbox.createSession}/${sessionId}`, {
+            const response = await apiRequest(API_ENDPOINTS.sandbox.deleteSession(sessionId), {
                 method: 'DELETE'
             })
 
@@ -259,22 +259,20 @@ const SandBoxChat = () => {
             return
         }
 
-        await addMessageToActive('user', userQuery)
+        // Don't save user message here - the streaming endpoint will handle it
         setLoading(true)
         setDisplayedText('')
         setHasAsked(true)
         setQuery('')
 
         try {
-            // Enhanced payload with chat context for sandbox
+            // FIXED: Use sandbox streaming endpoint and simplified payload
             const payload = {
-                question: userQuery,
-                system_prompt: selectedEnv.system_prompt,
-                temperature: selectedEnv.model_config?.temperature || 0.7,
-                chat_id: activeChatId // Add chat context for memory
+                role: 'user',
+                content: userQuery
             }
 
-            const response = await apiRequest(API_ENDPOINTS.chat.stream, {
+            const response = await apiRequest(API_ENDPOINTS.sandbox.chatStream(activeChatId), {
                 method: 'POST',
                 body: JSON.stringify(payload),
                 stream: true
@@ -283,6 +281,21 @@ const SandBoxChat = () => {
             if (!response.ok) {
                 throw new Error('Failed to get response')
             }
+
+            // Add user message to UI immediately
+            const userMessage = {
+                id: crypto.randomUUID(),
+                role: 'user',
+                content: userQuery,
+                created_at: new Date().toISOString()
+            }
+
+            setChatLogs(prev =>
+                prev.map(chat => {
+                    if (chat.id !== activeChatId) return chat
+                    return { ...chat, messages: [...chat.messages, userMessage] }
+                })
+            )
 
             // Handle streaming response
             const reader = response.body.getReader()
@@ -318,6 +331,8 @@ const SandBoxChat = () => {
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const token = line.substring(6)
+                        if (token === '[DONE]') break
+                        
                         fullResponse += token
 
                         // Update assistant message in real-time
@@ -343,9 +358,6 @@ const SandBoxChat = () => {
                 }
             }
 
-            // If you have a function to save sandbox messages, add it here
-            // await saveSandboxMessage(assistantMessage)
-
         } catch (error) {
             console.error('Error:', error)
             let errorMessage = 'Something went wrong.'
@@ -354,7 +366,20 @@ const SandBoxChat = () => {
                 errorMessage = 'Too many requests. Please wait a moment and try again.'
             }
             
-            await addMessageToActive('assistant', errorMessage)
+            // Add error message to UI
+            const errorAssistantMessage = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: errorMessage,
+                created_at: new Date().toISOString()
+            }
+
+            setChatLogs(prev =>
+                prev.map(chat => {
+                    if (chat.id !== activeChatId) return chat
+                    return { ...chat, messages: [...chat.messages, errorAssistantMessage] }
+                })
+            )
         } finally {
             setLoading(false)
         }
