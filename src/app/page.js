@@ -139,6 +139,10 @@ const HomePage = () => {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
             
+            if (token.trim() === '[DONE]') {
+              continue
+            }
+
             // Update ref immediately
             streamingContentRef.current += token
 
