@@ -139,8 +139,31 @@ const HomePage = () => {
           if (line.startsWith('data: ')) {
             const token = line.substring(6)
             
-            if (token.trim() === '[DONE]') {
-              continue
+            // Check if this line contains [DONE] - if so, stop processing
+            if (token.includes('[DONE]')) {
+              // If there's content before [DONE], add it
+              const contentBeforeDone = token.split('[DONE]')[0]
+              if (contentBeforeDone) {
+                streamingContentRef.current += contentBeforeDone
+                
+                // Update the UI one final time
+                ReactDOM.flushSync(() => {
+                  setChatLogs(prev => {
+                    return prev.map(chat => {
+                      if (chat.id !== activeChatId) return chat
+                      return {
+                        ...chat,
+                        messages: chat.messages.map(msg =>
+                          msg.id === assistantMessage.id
+                            ? { ...msg, content: streamingContentRef.current }
+                            : msg
+                        )
+                      }
+                    })
+                  })
+                })
+              }
+              break; // Exit the entire loop when we encounter [DONE]
             }
 
             // Update ref immediately
