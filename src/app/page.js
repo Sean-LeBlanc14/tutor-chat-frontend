@@ -517,12 +517,15 @@ const HomePage = () => {
                 : '';
 
               return (
-                <ChatMessage
-                  key={msg.id || index}
-                  message={msg}
-                  originalQuestion={userQuestion}
-                  isStreaming={false}
-                />
+                <div key={msg.id || index} className='chat-line'>
+                  <div className={`chat-bubble-wrapper ${msg.role}`}>
+                    <ChatMessage
+                      message={msg}
+                      originalQuestion={userQuestion}
+                      isStreaming={false}
+                    />
+                  </div>
+                </div>
               );
             })}
             {loading && (

@@ -1,7 +1,7 @@
 // components/ChatMessage.jsx
 import React, { useState, useEffect } from 'react';
-import { responseFormatter } from '@/app/utils/responseFormatter'
-import '@/components/chat-message/chat-message.styles.css';
+import { responseFormatter } from '@/app/utils/responseFormatter';
+import './ChatMessage.css';
 
 const ChatMessage = ({ message, originalQuestion = '', isStreaming = false }) => {
     const [showFormatted, setShowFormatted] = useState(false);
@@ -33,39 +33,37 @@ const ChatMessage = ({ message, originalQuestion = '', isStreaming = false }) =>
     const isHtmlContent = showFormatted && formattedContent;
 
     return (
-        <div className={`chat-message-container ${message.role}`}>
-        <div className={`chat-message ${message.role}`}>
-            <div className={`message-bubble ${message.role}`}>
-            {/* Format toggle button */}
-            {canFormat && !isStreaming && message.role === 'assistant' && (
-                <button 
-                className={`format-btn ${showFormatted ? 'active' : ''}`}
-                onClick={() => setShowFormatted(!showFormatted)}
-                title={showFormatted ? 'Show original response' : 'Show formatted response'}
-                >
-                {showFormatted ? '📄' : '✨'}
-                </button>
-            )}
+        // Use your existing chat-message class structure
+        <div className={`chat-message ${message.role}`} style={{ position: 'relative' }}>
+        {/* Format toggle button - only for assistant messages that can be formatted */}
+        {canFormat && !isStreaming && message.role === 'assistant' && (
+            <button 
+            className={`format-toggle-btn ${showFormatted ? 'active' : ''}`}
+            onClick={() => setShowFormatted(!showFormatted)}
+            title={showFormatted ? 'Show original response' : 'Show formatted response'}
+            >
+            {showFormatted ? '📄' : '✨'}
+            </button>
+        )}
 
-            {/* Message content */}
-            <div className="message-text">
-                {isHtmlContent ? (
-                <div dangerouslySetInnerHTML={{ __html: displayContent }} />
-                ) : (
-                <div className="raw-content">
-                    {displayContent}
-                </div>
-                )}
+        {/* Message content */}
+        {isHtmlContent ? (
+            <div 
+            className="formatted-content"
+            dangerouslySetInnerHTML={{ __html: displayContent }} 
+            />
+        ) : (
+            <div style={{ whiteSpace: 'pre-wrap' }}>
+            {displayContent}
             </div>
+        )}
 
-            {/* Streaming indicator */}
-            {isStreaming && (
-                <div className="streaming-indicator">
-                <span className="cursor">|</span>
-                </div>
-            )}
+        {/* Streaming indicator */}
+        {isStreaming && (
+            <div className="streaming-indicator">
+            <span className="streaming-cursor">|</span>
             </div>
-        </div>
+        )}
         </div>
     );
 };
