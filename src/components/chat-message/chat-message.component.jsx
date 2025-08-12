@@ -1,6 +1,6 @@
 // components/ChatMessage.jsx
 import React, { useState, useEffect } from 'react';
-import { responseFormatter } from '@/app/utils/simpleFormatter';
+import { responseFormatter } from '@/app/utils/responseFormatter'
 import '@/components/chat-message/chat-message.styles.css';
 
 const ChatMessage = ({ message, originalQuestion = '', isStreaming = false }) => {
