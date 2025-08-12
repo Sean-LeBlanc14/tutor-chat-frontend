@@ -1,6 +1,6 @@
 /* components/ChatMessage.css */
 
-/*.chat-message-container {
+.chat-message-container {
 width: 100%;
 display: flex;
 justify-content: center;
@@ -21,7 +21,7 @@ display: flex;
 padding: 0 1rem;
 box-sizing: border-box;
 position: relative;
-}*/
+}
 
 .chat-message.user {
 justify-content: flex-end;
@@ -31,7 +31,7 @@ justify-content: flex-end;
 justify-content: flex-start;
 }
 
-.message-bubble {
+/*.message-bubble {
 padding: 1rem 1.25rem;
 border-radius: var(--border-radius);
 line-height: 1.6;
@@ -60,7 +60,7 @@ background-color: var(--color-bg-secondary);
 color: var(--color-text-primary);
 border: 1px solid var(--color-border);
 border-bottom-left-radius: 6px;
-}
+}*/
 
 /* Format toggle button */
 .format-btn {
