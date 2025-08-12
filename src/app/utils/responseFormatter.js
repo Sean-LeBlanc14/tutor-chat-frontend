@@ -1,4 +1,4 @@
-export class SimpleFormatter {
+export class responseFormatter {
 
 // Main formatting function - very straightforward
 static formatResponse(text, question = '') {
