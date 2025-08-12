@@ -10,6 +10,7 @@ import Spinner from '@/components/spinner/spinner.component'
 import Sidebar from '@/components/sidebar/sidebar.component'
 import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
 import { sanitizeInput, validateInput } from '@/app/utils/security'
+import ChatMessage from '@/components/chat-message/chat-message.component'
 
 const HomePage = () => {
   const { user } = useAuth()
@@ -509,17 +510,21 @@ const HomePage = () => {
 
         {hasAsked && (
           <div className="chat-history" ref={chatHistoryRef}>
-            {messages.map((msg, index) => (
-              <div key={index} className='chat-line'>
-                <div className={`chat-bubble-wrapper ${msg.role}`}>
-                  <div 
-                    className={`chat-message ${msg.role}`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {messages.map((msg, index) => {
+              // Find the user question for this assistant response
+              const userQuestion = msg.role === 'assistant' && index > 0 
+                ? messages[index - 1]?.content || ''
+                : '';
+
+              return (
+                <ChatMessage
+                  key={msg.id || index}
+                  message={msg}
+                  originalQuestion={userQuestion}
+                  isStreaming={false}
+                />
+              );
+            })}
             {loading && (
               <div className="chat-line">
                 <div className="chat-bubble-wrapper assistant">
