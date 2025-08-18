@@ -1,4 +1,4 @@
-// Fixed page.js with direct DOM streaming (patched)
+// Fixed page.js with direct DOM streaming (patched for SSE join)
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -14,13 +14,12 @@ import ChatMessage from '@/components/chat-message/chat-message.component'
 
 const HomePage = () => {
   const { user } = useAuth()
-  const { isAdmin, loading: roleLoading } = useRole()
+  const { isAdmin } = useRole()
   const router = useRouter()
 
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasAsked, setHasAsked] = useState(false)
-  const [displayedText, setDisplayedText] = useState('')
   const [chatLogs, setChatLogs] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
   const [chatsLoaded, setChatsLoaded] = useState(false)
@@ -29,13 +28,13 @@ const HomePage = () => {
   const chatHistoryRef = useRef(null)
   const streamingContentRef = useRef('')
 
-  const activeChat = useMemo(() =>
-    chatLogs.find(chat => chat.id === activeChatId),
+  const activeChat = useMemo(
+    () => chatLogs.find(chat => chat.id === activeChatId),
     [chatLogs, activeChatId]
   )
 
-  const messages = useMemo(() =>
-    activeChat?.messages || [],
+  const messages = useMemo(
+    () => activeChat?.messages || [],
     [activeChat?.messages]
   )
 
@@ -53,9 +52,7 @@ const HomePage = () => {
     }
     title = title.replace(/[.!?]*$/, '')
     title = title.charAt(0).toUpperCase() + title.slice(1)
-    if (title.length < 3) {
-      title = 'New Chat'
-    }
+    if (title.length < 3) title = 'New Chat'
     return title
   }
 
@@ -64,7 +61,6 @@ const HomePage = () => {
     if (!query.trim()) return
 
     const userQuery = sanitizeInput(query.trim())
-
     if (!validateInput(userQuery, 5000)) {
       alert('Message is too long or contains invalid characters')
       return
@@ -72,7 +68,6 @@ const HomePage = () => {
 
     addMessageToActive('user', userQuery)
     setLoading(true)
-    setDisplayedText('')
     setHasAsked(true)
     setQuery('')
 
@@ -88,16 +83,12 @@ const HomePage = () => {
         body: JSON.stringify(payload),
         stream: true
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to get response')
-      }
+      if (!response.ok) throw new Error('Failed to get response')
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       streamingContentRef.current = ''
 
-      // Create assistant message
       const assistantMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -106,10 +97,10 @@ const HomePage = () => {
       }
 
       setChatLogs(prev =>
-        prev.map(chat => {
-          if (chat.id !== activeChatId) return chat
-          return { ...chat, messages: [...chat.messages, assistantMessage] }
-        })
+        prev.map(chat => chat.id === activeChatId
+          ? { ...chat, messages: [...chat.messages, assistantMessage] }
+          : chat
+        )
       )
       setStreamingMessageId(assistantMessage.id)
       setLoading(false)
@@ -122,18 +113,17 @@ const HomePage = () => {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          const dataLines = []
-          for (const line of evt.split('\n')) {
-            if (line.startsWith('data: ')) dataLines.push(line.slice(6))
-          }
-          const data = dataLines.join('\n')
-          if (!data) continue
+          const data = evt
+            .split('\n')
+            .filter(line => line.startsWith('data: '))
+            .map(line => line.slice(6))
+            .join('')  // ✅ join with '' to avoid cutting words
 
+          if (!data) continue
           if (data === '[DONE]') {
             doneStreaming = true
             break
@@ -181,6 +171,7 @@ const HomePage = () => {
       )
       setStreamingMessageId(null)
 
+      // Save assistant message
       if (user?.email && activeChatId && streamingContentRef.current) {
         try {
           await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
@@ -195,7 +186,6 @@ const HomePage = () => {
           console.error('Error saving assistant message:', error)
         }
       }
-
     } catch (error) {
       console.error('Error:', error)
       let errorMessage = 'Something went wrong.'
@@ -215,12 +205,7 @@ const HomePage = () => {
   const startNewChat = useCallback(() => {
     if (!user?.email) return
     const newChatId = crypto.randomUUID()
-    const newChat = {
-      id: newChatId,
-      title: '',
-      messages: [],
-      created_at: new Date().toISOString()
-    }
+    const newChat = { id: newChatId, title: '', messages: [], created_at: new Date().toISOString() }
     setChatLogs(prev => [newChat, ...prev])
     setActiveChatId(newChatId)
     setHasAsked(false)
@@ -242,40 +227,26 @@ const HomePage = () => {
     const currentChat = chatLogs.find(chat => chat.id === activeChatId)
     const isFirstUserMessage = currentChat && role === 'user' && currentChat.messages.length === 0
     let newTitle = currentChat?.title || ''
-    if (isFirstUserMessage) {
-      newTitle = generateChatTitle(content)
-    }
+    if (isFirstUserMessage) newTitle = generateChatTitle(content)
+
     setChatLogs(prev =>
-      prev.map(chat => {
-        if (chat.id !== activeChatId) return chat
-        const newMessages = [...chat.messages, newMessage]
-        return {
-          ...chat,
-          title: isFirstUserMessage ? newTitle : chat.title,
-          messages: newMessages
-        }
-      })
+      prev.map(chat => chat.id === activeChatId
+        ? { ...chat, title: isFirstUserMessage ? newTitle : chat.title, messages: [...chat.messages, newMessage] }
+        : chat
+      )
     )
+
     if (user?.email && activeChatId) {
       try {
         const response = await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
           method: 'POST',
-          body: JSON.stringify({
-            user_email: user.email,
-            role,
-            content: newMessage.content
-          })
+          body: JSON.stringify({ user_email: user.email, role, content: newMessage.content })
         })
         if (!response.ok) {
           const errorText = await response.text()
-          console.error('Failed to save message to backend:', errorText)
-        } else {
-          if (isFirstUserMessage && newTitle) {
-            const titleSaved = await updateChatTitleInBackend(activeChatId, newTitle)
-            if (!titleSaved) {
-              console.error('Failed to save chat title')
-            }
-          }
+          console.error('Failed to save message:', errorText)
+        } else if (isFirstUserMessage && newTitle) {
+          await updateChatTitleInBackend(activeChatId, newTitle)
         }
       } catch (error) {
         console.error('Error saving message:', error)
@@ -339,9 +310,7 @@ const HomePage = () => {
   }, [user?.email, router])
 
   useEffect(() => {
-    if (chatsLoaded && user?.email && chatLogs.length === 0) {
-      startNewChat()
-    }
+    if (chatsLoaded && user?.email && chatLogs.length === 0) startNewChat()
   }, [chatsLoaded, user?.email, chatLogs.length, startNewChat])
 
   const handleRenameChat = async (chatId, newTitle) => {
@@ -352,24 +321,18 @@ const HomePage = () => {
     }
     const originalTitle = chatLogs.find(chat => chat.id === chatId)?.title
     setChatLogs(prev =>
-      prev.map(chat =>
-        chat.id === chatId ? { ...chat, title: sanitizedTitle } : chat
-      )
+      prev.map(chat => chat.id === chatId ? { ...chat, title: sanitizedTitle } : chat)
     )
     try {
       const success = await updateChatTitleInBackend(chatId, sanitizedTitle)
       if (!success) {
         setChatLogs(prev =>
-          prev.map(chat =>
-            chat.id === chatId ? { ...chat, title: originalTitle } : chat
-          )
+          prev.map(chat => chat.id === chatId ? { ...chat, title: originalTitle } : chat)
         )
       }
     } catch (error) {
       setChatLogs(prev =>
-        prev.map(chat =>
-          chat.id === chatId ? { ...chat, title: originalTitle } : chat
-        )
+        prev.map(chat => chat.id === chatId ? { ...chat, title: originalTitle } : chat)
       )
       console.error('Error updating chat title:', error)
     }
@@ -394,9 +357,7 @@ const HomePage = () => {
         const response = await apiRequest(API_ENDPOINTS.chat.deleteChat(chatId, user.email), {
           method: 'DELETE'
         })
-        if (!response.ok) {
-          console.error('Failed to delete chat from backend')
-        }
+        if (!response.ok) console.error('Failed to delete chat from backend')
       } catch (error) {
         console.error('Error deleting chat:', error)
       }
@@ -404,9 +365,7 @@ const HomePage = () => {
   }
 
   useEffect(() => {
-    if (user === null) {
-      router.push('/login')
-    }
+    if (user === null) router.push('/login')
   }, [user, router])
 
   if (user && !chatsLoaded) {
