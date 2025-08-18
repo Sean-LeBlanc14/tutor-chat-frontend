@@ -6,7 +6,10 @@ export class responseFormatter {
         // 1) normalize very lightly
         let out = this.normalize(text);
 
-        // 2) add blank lines around obvious section starts
+        // 2) fix spacing around bold headers and colons (no content changes)
+        out = this.fixSpacing(out);
+
+        // 3) add blank lines around obvious section starts
         out = this.addSectionSeparators(out);
 
         return out;
@@ -21,6 +24,20 @@ export class responseFormatter {
         .replace(/ (?=[.,;!?])/g, '')       // remove space before punctuation
         .replace(/:([^\s])/g, ': $1')       // ensure a space after colon
         .replace(/\n{3,}/g, '\n\n')         // collapse 3+ blank lines
+        .trim();
+    }
+
+    // minimal, targeted spacing fixes (no rewriting of words)
+    static fixSpacing(text) {
+        return text
+        // ensure a blank line BEFORE any bold header-like marker if jammed to previous token
+        .replace(/(\S)\*\*([^*][^*]{0,200}?)\*\*/g, '$1\n\n**$2**')
+        // ensure a newline immediately AFTER bold block that looks like a header (optional trailing colon)
+        .replace(/\*\*([^*][^*]{2,}?)\*\*:?(\S)/g, '**$1**\n$2')
+        // ensure newline after colon if the next char starts a list number or bold header
+        .replace(/:([0-9*])/g, ':\n$1')
+        // collapse any accidental 3+ newlines
+        .replace(/\n{3,}/g, '\n\n')
         .trim();
     }
 
@@ -62,9 +79,10 @@ export class responseFormatter {
         // also ensure list groups are visually separated
         return out
         .join('\n')
-        // blank line between different list blocks jammed together
-        .replace(/(\n\d+\.\s[^\n]+)(?=\n\d+\.\s)/g, '$1') // keep numbered contiguous
-        .replace(/(\n[-*•]\s[^\n]+)(?=\n[-*•]\s)/g, '$1') // keep bullets contiguous
+        // keep numbered items contiguous but avoid jam with other blocks
+        .replace(/(\n\d+\.\s[^\n]+)(?=\n\d+\.\s)/g, '$1')
+        // keep bullets contiguous
+        .replace(/(\n[-*•]\s[^\n]+)(?=\n[-*•]\s)/g, '$1')
         .replace(/\n{3,}/g, '\n\n') // final tidy
         .trim();
     }
