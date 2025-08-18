@@ -1,109 +1,86 @@
 /* components/ChatMessage.css */
 
-/* Format toggle button - adds to your existing chat-message */
+/* Format toggle button */
 .format-toggle-btn {
-position: absolute;
-top: -8px;
-right: -8px;
-background: var(--color-bg-tertiary);
-border: 2px solid var(--color-border);
-border-radius: 50%;
-width: 28px;
-height: 28px;
-font-size: 12px;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-box-shadow: var(--shadow);
-transition: var(--transition);
-z-index: 10;
-color: var(--color-text-secondary);
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--color-bg-tertiary);
+    border: 2px solid var(--color-border);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    z-index: 10;
+    color: var(--color-text-secondary);
 }
 
 .format-toggle-btn:hover {
-border-color: var(--color-accent);
-background: var(--color-accent-light);
-transform: scale(1.1);
-color: var(--color-accent);
+    border-color: var(--color-accent);
+    background: var(--color-accent-light);
+    transform: scale(1.1);
+    color: var(--color-accent);
 }
 
 .format-toggle-btn.active {
-background: var(--color-accent-light);
-border-color: var(--color-accent);
-color: var(--color-accent);
+    background: var(--color-accent-light);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
 }
 
-/* Enhanced message content styles for formatted responses */
-.formatted-content .response-header {
-font-size: 1.2rem;
-font-weight: 600;
-margin: 0 0 0.75rem 0;
-color: var(--color-text-primary);
-border-bottom: 2px solid var(--color-border);
-padding-bottom: 0.5rem;
-}
-
-.formatted-content .bullet-item {
-margin: 0.5rem 0;
-padding: 0.75rem;
-background: var(--color-bg-tertiary);
-border-radius: var(--border-radius-small);
-border-left: 3px solid var(--color-accent);
-display: block;
-}
-
-.formatted-content strong {
-font-weight: 600;
-color: var(--color-text-primary);
-}
-
-.formatted-content p {
-margin: 0 0 0.75rem 0;
-line-height: 1.6;
-color: var(--color-text-primary);
-}
-
-.formatted-content p:last-child {
-margin-bottom: 0;
+/* Chat output (plain text rendering) */
+.chat-output {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    color: var(--color-text-primary);
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "clig" 0, "calt" 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Streaming indicator */
 .streaming-indicator {
-display: inline-block;
-margin-left: 0.25rem;
+    display: inline-block;
+    margin-left: 0.25rem;
 }
 
 .streaming-cursor {
-animation: blink-cursor 1s infinite;
-font-weight: bold;
-color: var(--color-accent);
+    animation: blink-cursor 1s infinite;
+    font-weight: bold;
+    color: var(--color-accent);
 }
 
 @keyframes blink-cursor {
-0%, 50% {
-    opacity: 1;
-}
-51%, 100% {
-    opacity: 0;
-}
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0;
+    }
 }
 
 /* Responsive adjustments for the format button */
 @media (max-width: 768px) {
-.format-toggle-btn {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
-    top: -6px;
-    right: -6px;
-}
+    .format-toggle-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+        top: -6px;
+        right: -6px;
+    }
 }
 
 @media (max-width: 480px) {
-.format-toggle-btn {
-    width: 20px;
-    height: 20px;
-    font-size: 9px;
-}
+    .format-toggle-btn {
+        width: 20px;
+        height: 20px;
+        font-size: 9px;
+    }
 }
