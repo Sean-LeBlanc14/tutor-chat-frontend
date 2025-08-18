@@ -1,133 +1,71 @@
+// ultra-minimal: only add readable section spacing
 export class responseFormatter {
-    // Main formatting function
     static formatResponse(text, question = '') {
         if (!text || text.trim().length < 50) return text;
 
-        // Step 1: cleanup (preserve line structure)
-        const cleaned = this.basicCleanup(text);
+        // 1) normalize very lightly
+        let out = this.normalize(text);
 
-        // Step 2: decide on formatting style
-        const needsList = this.shouldFormatAsList(cleaned, question);
+        // 2) add blank lines around obvious section starts
+        out = this.addSectionSeparators(out);
 
-        return needsList
-        ? this.formatAsList(cleaned, question)
-        : this.formatAsGeneral(cleaned, question);
+        return out;
     }
 
-    // --- Safe cleanup (preserves newlines) ---
-    static basicCleanup(text) {
-        if (!text) return '';
+    // keep it gentle: don't collapse paragraphs, don't touch words
+    static normalize(text) {
         return String(text)
-        .replace(/\r\n?/g, '\n')              // normalize line endings
-        .replace(/[ \t]+/g, ' ')              // collapse spaces/tabs (not newlines)
-        .replace(/[ \t]+\n/g, '\n')           // trim trailing spaces
-        .replace(/\n[ \t]+/g, '\n')           // trim leading spaces
-        .replace(/\n{3,}/g, '\n\n')           // collapse 3+ blank lines
-        .replace(/ (?=[.,:;!?])/g, '')        // remove space before punctuation
-        .replace(/([.!?])([A-Za-z])/g, '$1 $2') // ensure space after sentence
+        .replace(/\r\n?/g, '\n')            // normalize newlines
+        .replace(/[ \t]+\n/g, '\n')         // trim trailing spaces at line end
+        .replace(/\n[ \t]+/g, '\n')         // trim leading spaces at line start
+        .replace(/ (?=[.,;!?])/g, '')       // remove space before punctuation
+        .replace(/:([^\s])/g, ': $1')       // ensure a space after colon
+        .replace(/\n{3,}/g, '\n\n')         // collapse 3+ blank lines
         .trim();
     }
 
-    // --- Decide if we should show a list (safer trigger) ---
-    static shouldFormatAsList(text, question) {
-        // Strong signal in the question
-        const qHasList = /(?:effects?|types?|benefits?|ways?|examples?|factors?|characteristics?) of/i.test(question);
+    static addSectionSeparators(text) {
+        const lines = text.split('\n');
+        const out = [];
 
-        // Count well-formed numbered lines at line starts: "1. ..." on its own line
-        const numberedLines = text.match(/(?:^|\n)\d+\.\s+/g) || [];
+        // patterns that look like section headers
+        const isHeaderLine = (line) =>
+        /^#{1,6}\s+/.test(line) ||                           // Markdown headers
+        /^\*\*[^*]{3,}\*\*:?$/.test(line.trim()) ||          // **Header** or **Header:**
+        /^[A-Z][A-Za-z0-9 ,/&()-]{3,}:\s*$/.test(line.trim()); // "Cognitive Effects:" style
 
-        // Count bullet lines at line starts: "-", "*", or "• "
-        const bulletLines = text.match(/(?:^|\n)(?:[-*•])\s+/g) || [];
+        // list starts
+        const isNumbered = (line) => /^\d+\.\s+/.test(line.trim());
+        const isBulleted = (line) => /^[-*•]\s+/.test(line.trim());
 
-        // Only auto-format when it clearly looks like a list
-        const hasWellFormedList = numberedLines.length >= 3 || bulletLines.length >= 3;
+        for (let i = 0; i < lines.length; i++) {
+        const prev = out.length ? out[out.length - 1] : '';
+        const line = lines[i];
 
-        // If the question hints at a list, require *some* structure and paragraph breaks
-        const hasSomeListSignals =
-        (numberedLines.length + bulletLines.length) >= 2 && /\n{2,}/.test(text);
+        const header = isHeaderLine(line);
+        const listStart = isNumbered(line) || isBulleted(line);
 
-        return hasWellFormedList || (qHasList && hasSomeListSignals);
-    }
-
-    // --- Format text as a list ---
-    static formatAsList(text, question) {
-        const header = this.extractSimpleHeader(question);
-        let out = header ? `## ${header}\n\n` : '';
-
-        // Prefer explicit numbered items at line starts
-        const numberedItems = text
-        .split(/(?:^|\n)(?=\d+\.\s+)/) // split but keep item tokens by using lookahead
-        .map(s => s.trim())
-        .filter(Boolean)
-        .filter(s => /^\d+\.\s+/.test(s));
-
-        if (numberedItems.length >= 2) {
-        out += numberedItems
-            .map(s => {
-            const m = s.match(/^(\d+)\.\s*(.+)$/s);
-            if (!m) return s;
-            const [, n, body] = m;
-
-            // If the first clause reads like a short title, bold it
-            const sentences = body.trim().split(/[.!?]\s+/);
-            if (sentences.length > 1 && (sentences[0].includes(':') || sentences[0].length < 60)) {
-                const first = sentences[0].replace(/:$/, '');
-                const rest = sentences.slice(1).join('. ');
-                return `**${n}. ${first}**\n${rest}`;
-            }
-            return `**${n}.** ${body.trim()}`;
-            })
-            .join('\n\n');
-        return out;
+        // ensure a blank line BEFORE headers or list starts (if previous isn't blank)
+        if ((header || listStart) && prev !== '' && out[out.length - 1] !== '') {
+            out.push('');
         }
 
-        // Otherwise, try bullet lines at line starts
-        const bulletLines = text
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => /^[-*•]\s+/.test(l));
+        out.push(line);
 
-        if (bulletLines.length >= 2) {
-        out += bulletLines
-            .map(l => '• ' + l.replace(/^[-*•]\s+/, '').trim())
-            .join('\n');
-        return out;
-        }
-
-        // If no explicit markers, fall back to sentence bullets when there are several full sentences
-        const sentences = text.split(/[.!?]\s+/).filter(s => s.trim().length > 20);
-        if (sentences.length >= 3) {
-        out += sentences.map(s => `• ${s.trim()}`).join('\n');
-        return out;
-        }
-
-        // Fallback: just return with header if we made one
-        return header ? `${out}${text}` : text;
-    }
-
-    // --- Format as general text (paragraph style) ---
-    static formatAsGeneral(text, question) {
-        const header = this.extractSimpleHeader(question);
-        return header && text.length > 200 ? `## ${header}\n\n${text}` : text;
-    }
-
-    // --- Header extractor based on question ---
-    static extractSimpleHeader(question) {
-        if (!question) return '';
-        const patterns = [
-        { re: /effects? of (.+)/i, t: 'Effects of $1' },
-        { re: /what (?:is|are) (.+)/i, t: '$1' },
-        { re: /types? of (.+)/i, t: 'Types of $1' },
-        { re: /benefits? of (.+)/i, t: 'Benefits of $1' },
-        { re: /examples? of (.+)/i, t: 'Examples of $1' },
-        ];
-        for (const { re, t } of patterns) {
-        const m = question.match(re);
-        if (m) {
-            const hdr = question.replace(re, t).replace(/[?.]/g, '').trim();
-            return hdr.charAt(0).toUpperCase() + hdr.slice(1);
+        // ensure a blank line AFTER a header line (if next line is content)
+        const next = lines[i + 1] ?? '';
+        if (header && next !== '' && !isHeaderLine(next)) {
+            out.push('');
         }
         }
-        return '';
+
+        // also ensure list groups are visually separated
+        return out
+        .join('\n')
+        // blank line between different list blocks jammed together
+        .replace(/(\n\d+\.\s[^\n]+)(?=\n\d+\.\s)/g, '$1') // keep numbered contiguous
+        .replace(/(\n[-*•]\s[^\n]+)(?=\n[-*•]\s)/g, '$1') // keep bullets contiguous
+        .replace(/\n{3,}/g, '\n\n') // final tidy
+        .trim();
     }
 }
