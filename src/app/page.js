@@ -1,4 +1,4 @@
-// Fixed page.js with token buffering and markdown processing
+// Fixed page.js with simple streaming and markdown processing
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -27,8 +27,6 @@ const HomePage = () => {
 
   const chatHistoryRef = useRef(null)
   const streamingContentRef = useRef('')
-  const tokenBufferRef = useRef('')
-  const lastUpdateTimeRef = useRef(0)
 
   const activeChat = useMemo(
     () => chatLogs.find(chat => chat.id === activeChatId),
@@ -58,76 +56,11 @@ const HomePage = () => {
     return title
   }
 
-  // Process markdown formatting
+  // Simple markdown processing
   const processMarkdown = (text) => {
     return text
-      // Bold text: **text** -> <strong>text</strong>
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      // Italic text: *text* -> <em>text</em>
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      // Headers: ## text -> <h2>text</h2>
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      // Convert newlines to <br> for HTML rendering
-      .replace(/\n/g, '<br>')
-  }
-
-  // Buffer tokens and update UI periodically
-  const updateStreamingContent = (newToken, forceUpdate = false) => {
-    tokenBufferRef.current += newToken
-    const now = Date.now()
-    
-    // Update every 50ms or on force update, or if we hit word boundaries
-    const shouldUpdate = forceUpdate || 
-                        (now - lastUpdateTimeRef.current > 50) ||
-                        /[\s\n\.]$/.test(newToken) // word/sentence boundary
-    
-    if (shouldUpdate) {
-      // Clean up the buffered content
-      let cleanedContent = tokenBufferRef.current
-        // Remove extra spaces between characters
-        .replace(/(\w)\s+(\w)/g, '$1$2')
-        // Fix broken words that got split across tokens
-        .replace(/([a-z])\s+([a-z])/g, '$1$2')
-        // Restore proper spacing after punctuation
-        .replace(/([.!?])\s*([A-Z])/g, '$1 $2')
-        // Restore spacing around words
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
-        // Fix numbered lists
-        .replace(/(\d+)\s*\.\s*/g, '\n$1. ')
-        // Fix bullet points
-        .replace(/\*\s+/g, '\n* ')
-        // Clean up multiple spaces
-        .replace(/\s+/g, ' ')
-        // Fix paragraph breaks
-        .replace(/\n\s*\n/g, '\n\n')
-        // Trim leading/trailing whitespace
-        .trim()
-
-      streamingContentRef.current = cleanedContent
-      lastUpdateTimeRef.current = now
-
-      ReactDOM.flushSync(() => {
-        setChatLogs(prev =>
-          prev.map(chat => {
-            if (chat.id !== activeChatId) return chat
-            return {
-              ...chat,
-              messages: chat.messages.map(msg =>
-                msg.id === streamingMessageId
-                  ? { ...msg, content: streamingContentRef.current }
-                  : msg
-              )
-            }
-          })
-        )
-      })
-
-      if (chatHistoryRef.current) {
-        chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-      }
-    }
   }
 
   const handleFormSubmit = async (event) => {
@@ -161,11 +94,7 @@ const HomePage = () => {
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
-      
-      // Reset streaming state
       streamingContentRef.current = ''
-      tokenBufferRef.current = ''
-      lastUpdateTimeRef.current = 0
 
       const assistantMessage = {
         id: crypto.randomUUID(),
@@ -192,26 +121,47 @@ const HomePage = () => {
 
         buffer += decoder.decode(value, { stream: true })
 
-        // Split by SSE event boundary
+        // Split by SSE event boundary (blank line)
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          if (!evt.trim()) continue
-
           const lines = evt.split('\n')
-          for (const line of lines) {
-            const dataMatch = line.match(/^data:\s?(.*)$/)
-            if (dataMatch) {
-              const content = dataMatch[1]
-              
-              if (content === '[DONE]') {
-                doneStreaming = true
-                break
-              }
 
-              // Add each token to buffer and update periodically
-              updateStreamingContent(content)
+          for (const line of lines) {
+            // Keep every line; if it has "data:", strip the prefix; otherwise skip.
+            const m = line.match(/^data:\s?(.*)$/)
+            if (!m) continue
+
+            const contentLine = m[1]
+
+            // Treat sentinel as control (do not render)
+            if (contentLine === '[DONE]') {
+              doneStreaming = true
+              break
+            }
+
+            // Add content directly to stream
+            streamingContentRef.current += contentLine
+
+            ReactDOM.flushSync(() => {
+              setChatLogs(prev =>
+                prev.map(chat => {
+                  if (chat.id !== activeChatId) return chat
+                  return {
+                    ...chat,
+                    messages: chat.messages.map(msg =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, content: streamingContentRef.current }
+                        : msg
+                    )
+                  }
+                })
+              )
+            })
+
+            if (chatHistoryRef.current) {
+              chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
             }
           }
 
@@ -221,12 +171,10 @@ const HomePage = () => {
         if (doneStreaming) break
       }
 
-      // Final update with complete content
-      updateStreamingContent('', true)
-
-      // Process final content for markdown
+      // Process markdown in final content
       const finalContent = processMarkdown(streamingContentRef.current)
-      
+
+      // Final update with markdown processed
       setChatLogs(prev =>
         prev.map(chat => {
           if (chat.id !== activeChatId) return chat
