@@ -1,4 +1,4 @@
-// Fixed page.js with improved SSE formatting (preserves paragraphs and spacing)
+// Fixed page.js with token buffering and markdown processing
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -27,6 +27,8 @@ const HomePage = () => {
 
   const chatHistoryRef = useRef(null)
   const streamingContentRef = useRef('')
+  const tokenBufferRef = useRef('')
+  const lastUpdateTimeRef = useRef(0)
 
   const activeChat = useMemo(
     () => chatLogs.find(chat => chat.id === activeChatId),
@@ -54,6 +56,78 @@ const HomePage = () => {
     title = title.charAt(0).toUpperCase() + title.slice(1)
     if (title.length < 3) title = 'New Chat'
     return title
+  }
+
+  // Process markdown formatting
+  const processMarkdown = (text) => {
+    return text
+      // Bold text: **text** -> <strong>text</strong>
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      // Italic text: *text* -> <em>text</em>
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      // Headers: ## text -> <h2>text</h2>
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      // Convert newlines to <br> for HTML rendering
+      .replace(/\n/g, '<br>')
+  }
+
+  // Buffer tokens and update UI periodically
+  const updateStreamingContent = (newToken, forceUpdate = false) => {
+    tokenBufferRef.current += newToken
+    const now = Date.now()
+    
+    // Update every 50ms or on force update, or if we hit word boundaries
+    const shouldUpdate = forceUpdate || 
+                        (now - lastUpdateTimeRef.current > 50) ||
+                        /[\s\n\.]$/.test(newToken) // word/sentence boundary
+    
+    if (shouldUpdate) {
+      // Clean up the buffered content
+      let cleanedContent = tokenBufferRef.current
+        // Remove extra spaces between characters
+        .replace(/(\w)\s+(\w)/g, '$1$2')
+        // Fix broken words that got split across tokens
+        .replace(/([a-z])\s+([a-z])/g, '$1$2')
+        // Restore proper spacing after punctuation
+        .replace(/([.!?])\s*([A-Z])/g, '$1 $2')
+        // Restore spacing around words
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        // Fix numbered lists
+        .replace(/(\d+)\s*\.\s*/g, '\n$1. ')
+        // Fix bullet points
+        .replace(/\*\s+/g, '\n* ')
+        // Clean up multiple spaces
+        .replace(/\s+/g, ' ')
+        // Fix paragraph breaks
+        .replace(/\n\s*\n/g, '\n\n')
+        // Trim leading/trailing whitespace
+        .trim()
+
+      streamingContentRef.current = cleanedContent
+      lastUpdateTimeRef.current = now
+
+      ReactDOM.flushSync(() => {
+        setChatLogs(prev =>
+          prev.map(chat => {
+            if (chat.id !== activeChatId) return chat
+            return {
+              ...chat,
+              messages: chat.messages.map(msg =>
+                msg.id === streamingMessageId
+                  ? { ...msg, content: streamingContentRef.current }
+                  : msg
+              )
+            }
+          })
+        )
+      })
+
+      if (chatHistoryRef.current) {
+        chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+      }
+    }
   }
 
   const handleFormSubmit = async (event) => {
@@ -87,7 +161,11 @@ const HomePage = () => {
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
+      
+      // Reset streaming state
       streamingContentRef.current = ''
+      tokenBufferRef.current = ''
+      lastUpdateTimeRef.current = 0
 
       const assistantMessage = {
         id: crypto.randomUUID(),
@@ -113,70 +191,27 @@ const HomePage = () => {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-        // Keep original line endings - don't normalize CRLF to LF yet
 
-        // Split by SSE event boundary (blank line)
+        // Split by SSE event boundary
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          if (!evt.trim()) continue // Skip completely empty events
+          if (!evt.trim()) continue
 
-          const contentLines = []
-
-          for (const line of evt.split('\n')) {
-            // Handle SSE data lines and preserve empty content lines
+          const lines = evt.split('\n')
+          for (const line of lines) {
             const dataMatch = line.match(/^data:\s?(.*)$/)
             if (dataMatch) {
-              contentLines.push(dataMatch[1])
-            } else if (line.trim() === '') {
-              // Preserve empty lines for paragraph breaks
-              contentLines.push('')
-            } else {
-              // Handle other SSE fields (event:, id:, retry:) - ignore for now
-              continue
-            }
-          }
+              const content = dataMatch[1]
+              
+              if (content === '[DONE]') {
+                doneStreaming = true
+                break
+              }
 
-          // Process the content lines
-          for (const contentLine of contentLines) {
-            // Check for stream end sentinel
-            if (contentLine === '[DONE]') {
-              doneStreaming = true
-              break
-            }
-
-            // Add content with proper line break handling
-            if (streamingContentRef.current === '') {
-              // First chunk - no leading newline
-              streamingContentRef.current = contentLine
-            } else if (contentLine === '') {
-              // Empty line - add double newline for paragraph break
-              streamingContentRef.current += '\n\n'
-            } else {
-              // Regular content - add single newline then content
-              streamingContentRef.current += '\n' + contentLine
-            }
-
-            // Update UI with current content
-            ReactDOM.flushSync(() => {
-              setChatLogs(prev =>
-                prev.map(chat => {
-                  if (chat.id !== activeChatId) return chat
-                  return {
-                    ...chat,
-                    messages: chat.messages.map(msg =>
-                      msg.id === assistantMessage.id
-                        ? { ...msg, content: streamingContentRef.current }
-                        : msg
-                    )
-                  }
-                })
-              )
-            })
-
-            if (chatHistoryRef.current) {
-              chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+              // Add each token to buffer and update periodically
+              updateStreamingContent(content)
             }
           }
 
@@ -186,7 +221,12 @@ const HomePage = () => {
         if (doneStreaming) break
       }
 
-      // Final update to ensure all content is captured
+      // Final update with complete content
+      updateStreamingContent('', true)
+
+      // Process final content for markdown
+      const finalContent = processMarkdown(streamingContentRef.current)
+      
       setChatLogs(prev =>
         prev.map(chat => {
           if (chat.id !== activeChatId) return chat
@@ -194,7 +234,7 @@ const HomePage = () => {
             ...chat,
             messages: chat.messages.map(msg =>
               msg.id === assistantMessage.id
-                ? { ...msg, content: streamingContentRef.current }
+                ? { ...msg, content: finalContent }
                 : msg
             )
           }
@@ -203,14 +243,14 @@ const HomePage = () => {
       setStreamingMessageId(null)
 
       // Save assistant message
-      if (user?.email && activeChatId && streamingContentRef.current) {
+      if (user?.email && activeChatId && finalContent) {
         try {
           await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
             method: 'POST',
             body: JSON.stringify({
               user_email: user.email,
               role: 'assistant',
-              content: streamingContentRef.current
+              content: finalContent
             })
           })
         } catch (error) {
