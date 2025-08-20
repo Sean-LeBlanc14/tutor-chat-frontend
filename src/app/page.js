@@ -1,4 +1,4 @@
-// Fixed page.js with simple streaming and markdown processing
+// Fixed page.js with direct DOM streaming (no line drops; SSE-safe)
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -54,13 +54,6 @@ const HomePage = () => {
     title = title.charAt(0).toUpperCase() + title.slice(1)
     if (title.length < 3) title = 'New Chat'
     return title
-  }
-
-  // Simple markdown processing
-  const processMarkdown = (text) => {
-    return text
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
   }
 
   const handleFormSubmit = async (event) => {
@@ -120,49 +113,52 @@ const HomePage = () => {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
+        buffer = buffer.replace(/\r\n/g, '\n') // normalize CRLF to LF
 
         // Split by SSE event boundary (blank line)
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          const lines = evt.split('\n')
+          const outLines = []
 
-          for (const line of lines) {
-            // Keep every line; if it has "data:", strip the prefix; otherwise skip.
+          for (const line of evt.split('\n')) {
+            // Keep every line; if it has "data:", strip the prefix; otherwise include as-is.
             const m = line.match(/^data:\s?(.*)$/)
-            if (!m) continue
-
-            const contentLine = m[1]
+            const contentLine = m ? m[1] : line
 
             // Treat sentinel as control (do not render)
             if (contentLine === '[DONE]') {
               doneStreaming = true
-              break
+              continue
             }
 
-            // Add content directly to stream
-            streamingContentRef.current += contentLine
+            outLines.push(contentLine)
+          }
 
-            ReactDOM.flushSync(() => {
-              setChatLogs(prev =>
-                prev.map(chat => {
-                  if (chat.id !== activeChatId) return chat
-                  return {
-                    ...chat,
-                    messages: chat.messages.map(msg =>
-                      msg.id === assistantMessage.id
-                        ? { ...msg, content: streamingContentRef.current }
-                        : msg
-                    )
-                  }
-                })
-              )
-            })
+          if (outLines.length === 0) continue
 
-            if (chatHistoryRef.current) {
-              chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-            }
+          const data = outLines.join('\n') // preserve line breaks exactly
+          streamingContentRef.current += data
+
+          ReactDOM.flushSync(() => {
+            setChatLogs(prev =>
+              prev.map(chat => {
+                if (chat.id !== activeChatId) return chat
+                return {
+                  ...chat,
+                  messages: chat.messages.map(msg =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: streamingContentRef.current }
+                      : msg
+                  )
+                }
+              })
+            )
+          })
+
+          if (chatHistoryRef.current) {
+            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
           }
 
           if (doneStreaming) break
@@ -171,10 +167,7 @@ const HomePage = () => {
         if (doneStreaming) break
       }
 
-      // Process markdown in final content
-      const finalContent = processMarkdown(streamingContentRef.current)
-
-      // Final update with markdown processed
+      // Final update
       setChatLogs(prev =>
         prev.map(chat => {
           if (chat.id !== activeChatId) return chat
@@ -182,7 +175,7 @@ const HomePage = () => {
             ...chat,
             messages: chat.messages.map(msg =>
               msg.id === assistantMessage.id
-                ? { ...msg, content: finalContent }
+                ? { ...msg, content: streamingContentRef.current }
                 : msg
             )
           }
@@ -191,14 +184,14 @@ const HomePage = () => {
       setStreamingMessageId(null)
 
       // Save assistant message
-      if (user?.email && activeChatId && finalContent) {
+      if (user?.email && activeChatId && streamingContentRef.current) {
         try {
           await apiRequest(API_ENDPOINTS.chat.messages(activeChatId), {
             method: 'POST',
             body: JSON.stringify({
               user_email: user.email,
               role: 'assistant',
-              content: finalContent
+              content: streamingContentRef.current
             })
           })
         } catch (error) {
