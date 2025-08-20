@@ -113,17 +113,21 @@ const HomePage = () => {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
+        buffer = buffer.replace(/\r\n/g, '\n') // normalize line endings
+
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          const data = evt
-            .split('\n')
-            .filter(line => line.startsWith('data: '))
-            .map(line => line.slice(6))
-            .join('')  // ✅ join with '' to avoid cutting words
+          const dataLines = []
+          for (const line of evt.split('\n')) {
+            const m = line.match(/^data:\s?(.*)$/)
+            if (m) dataLines.push(m[1])
+          }
 
-          if (!data) continue
+          if (dataLines.length === 0) continue
+          const data = dataLines.join('\n') // preserve newlines exactly
+
           if (data === '[DONE]') {
             doneStreaming = true
             break
