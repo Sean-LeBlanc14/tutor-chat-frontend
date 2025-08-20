@@ -1,4 +1,4 @@
-// Fixed page.js with direct DOM streaming (patched for SSE join)
+// Fixed page.js with direct DOM streaming (no line drops; SSE-safe)
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -113,26 +113,32 @@ const HomePage = () => {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-        buffer = buffer.replace(/\r\n/g, '\n') // normalize line endings
+        buffer = buffer.replace(/\r\n/g, '\n') // normalize CRLF to LF
 
+        // Split by SSE event boundary (blank line)
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          const dataLines = []
+          const outLines = []
+
           for (const line of evt.split('\n')) {
+            // Keep every line; if it has "data:", strip the prefix; otherwise include as-is.
             const m = line.match(/^data:\s?(.*)$/)
-            if (m) dataLines.push(m[1])
+            const contentLine = m ? m[1] : line
+
+            // Treat sentinel as control (do not render)
+            if (contentLine === '[DONE]') {
+              doneStreaming = true
+              continue
+            }
+
+            outLines.push(contentLine)
           }
 
-          if (dataLines.length === 0) continue
-          const data = dataLines.join('\n') // preserve newlines exactly
+          if (outLines.length === 0) continue
 
-          if (data === '[DONE]') {
-            doneStreaming = true
-            break
-          }
-
+          const data = outLines.join('\n') // preserve line breaks exactly
           streamingContentRef.current += data
 
           ReactDOM.flushSync(() => {
@@ -154,6 +160,8 @@ const HomePage = () => {
           if (chatHistoryRef.current) {
             chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
           }
+
+          if (doneStreaming) break
         }
 
         if (doneStreaming) break
