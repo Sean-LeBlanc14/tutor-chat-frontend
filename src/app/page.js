@@ -112,58 +112,61 @@ const HomePage = () => {
         const { done, value } = await reader.read()
         if (done) break
 
-        const rawChunk = decoder.decode(value, { stream: true })
-        buffer += rawChunk
+        buffer += decoder.decode(value, { stream: true })
 
-        // Split by SSE event boundary (double newline)
-        const events = buffer.split('\n\n')
-        buffer = events.pop() || ''
-
-        for (const evt of events) {
-          if (!evt.trim()) continue // Skip empty events
-          
-          // Process all lines in the event
-          const lines = evt.split('\n')
+        // Process all complete SSE messages (ending with \n\n)
+        let lastEventEnd = buffer.lastIndexOf('\n\n')
+        if (lastEventEnd === -1) continue // No complete event yet
+        
+        // Extract all complete events
+        const completeData = buffer.substring(0, lastEventEnd + 2)
+        buffer = buffer.substring(lastEventEnd + 2) // Keep incomplete data in buffer
+        
+        // Split into individual events
+        const events = completeData.split('\n\n').filter(e => e.trim())
+        
+        for (const event of events) {
+          // Each event might have multiple lines
+          const lines = event.split('\n')
           
           for (const line of lines) {
-            // Only process lines that start with "data: "
-            if (line.startsWith('data: ')) {
-              const content = line.substring(6) // Use substring to preserve exact content
-              
-              // Check for sentinel
-              if (content === '[DONE]') {
-                doneStreaming = true
-                break
-              }
-              
-              // Add content exactly as received (including newlines in the content)
-              streamingContentRef.current += content
+            if (!line.startsWith('data: ')) continue
+            
+            // Extract content after 'data: '
+            const content = line.substring(6)
+            
+            // Check for end signal
+            if (content === '[DONE]') {
+              doneStreaming = true
+              break
             }
-            // Ignore lines that don't start with "data: "
+            
+            // Append content exactly as received
+            streamingContentRef.current += content
           }
-
-          // Update UI with accumulated content
-          ReactDOM.flushSync(() => {
-            setChatLogs(prev =>
-              prev.map(chat => {
-                if (chat.id !== activeChatId) return chat
-                return {
-                  ...chat,
-                  messages: chat.messages.map(msg =>
-                    msg.id === assistantMessage.id
-                      ? { ...msg, content: streamingContentRef.current }
-                      : msg
-                  )
-                }
-              })
-            )
-          })
-
-          if (chatHistoryRef.current) {
-            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-          }
-
+          
           if (doneStreaming) break
+        }
+
+        // Update UI with current content
+        ReactDOM.flushSync(() => {
+          setChatLogs(prev =>
+            prev.map(chat => {
+              if (chat.id !== activeChatId) return chat
+              return {
+                ...chat,
+                messages: chat.messages.map(msg =>
+                  msg.id === assistantMessage.id
+                    ? { ...msg, content: streamingContentRef.current }
+                    : msg
+                )
+              }
+            })
+          )
+        })
+
+        if (chatHistoryRef.current) {
+          chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
         }
 
         if (doneStreaming) break
