@@ -112,35 +112,54 @@ const HomePage = () => {
         const { done, value } = await reader.read()
         if (done) break
 
-        buffer += decoder.decode(value, { stream: true })
-        buffer = buffer.replace(/\r\n/g, '\n') // normalize CRLF to LF
+        const rawChunk = decoder.decode(value, { stream: true })
+        
+        // DEBUGGING: Log raw chunk
+        console.log('DEBUG - Raw chunk:', JSON.stringify(rawChunk))
+        
+        buffer += rawChunk
+        
+        // DEBUGGING: Log buffer state
+        console.log('DEBUG - Buffer after adding chunk:', JSON.stringify(buffer))
 
         // Split by SSE event boundary (blank line)
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          const outLines = []
-
-          for (const line of evt.split('\n')) {
-            // Keep every line; if it has "data:", strip the prefix; otherwise include as-is.
-            const m = line.match(/^data:\s?(.*)$/)
-            const contentLine = m ? m[1] : line
-
-            // Treat sentinel as control (do not render)
-            if (contentLine === '[DONE]') {
-              doneStreaming = true
-              continue
+          // DEBUGGING: Log each event
+          console.log('DEBUG - Processing event:', JSON.stringify(evt))
+          
+          // Process each line in the event
+          const lines = evt.split('\n')
+          
+          for (const line of lines) {
+            // Only process lines that start with "data: "
+            if (line.startsWith('data: ')) {
+              const content = line.slice(6) // Remove "data: " prefix
+              
+              // DEBUGGING: Log extracted content
+              console.log('DEBUG - Extracted content:', JSON.stringify(content))
+              
+              // Check for sentinel
+              if (content === '[DONE]') {
+                doneStreaming = true
+                console.log('DEBUG - Found [DONE] sentinel')
+                break
+              }
+              
+              // Add content to stream
+              streamingContentRef.current += content
+              
+              // DEBUGGING: Log accumulated content
+              console.log('DEBUG - Total accumulated content:', JSON.stringify(streamingContentRef.current))
+            } else if (line.trim()) {
+              // DEBUGGING: Log non-data lines
+              console.log('DEBUG - Non-data line found:', JSON.stringify(line))
             }
-
-            outLines.push(contentLine)
           }
 
-          if (outLines.length === 0) continue
-
-          const data = outLines.join('\n') // preserve line breaks exactly
-          streamingContentRef.current += data
-
+          // Update UI with accumulated content
           ReactDOM.flushSync(() => {
             setChatLogs(prev =>
               prev.map(chat => {
