@@ -114,59 +114,57 @@ const HomePage = () => {
 
         buffer += decoder.decode(value, { stream: true })
 
-        // Process all complete SSE messages (ending with \n\n)
-        let lastEventEnd = buffer.lastIndexOf('\n\n')
-        if (lastEventEnd === -1) continue // No complete event yet
-        
-        // Extract all complete events
-        const completeData = buffer.substring(0, lastEventEnd + 2)
-        buffer = buffer.substring(lastEventEnd + 2) // Keep incomplete data in buffer
-        
-        // Split into individual events
-        const events = completeData.split('\n\n').filter(e => e.trim())
-        
-        for (const event of events) {
-          // Each event might have multiple lines
-          const lines = event.split('\n')
-          
+        // Split by SSE event boundary (blank line)
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+
+        for (const evt of events) {
+          const lines = evt.split('\n')
+
           for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            
-            // Extract content after 'data: '
-            const content = line.substring(6)
-            
-            // Check for end signal
-            if (content === '[DONE]') {
-              doneStreaming = true
-              break
-            }
-            
-            // Append content exactly as received
-            streamingContentRef.current += content
-          }
-          
-          if (doneStreaming) break
-        }
-
-        // Update UI with current content
-        ReactDOM.flushSync(() => {
-          setChatLogs(prev =>
-            prev.map(chat => {
-              if (chat.id !== activeChatId) return chat
-              return {
-                ...chat,
-                messages: chat.messages.map(msg =>
-                  msg.id === assistantMessage.id
-                    ? { ...msg, content: streamingContentRef.current }
-                    : msg
-                )
+            // Check if line starts with "data: "
+            if (line.startsWith('data: ')) {
+              // Extract everything after "data: " INCLUDING newlines and spaces
+              const contentLine = line.substring(6)
+              
+              // Check for sentinel
+              if (contentLine === '[DONE]') {
+                doneStreaming = true
+                continue
               }
-            })
-          )
-        })
 
-        if (chatHistoryRef.current) {
-          chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+              // Add to content stream exactly as is
+              streamingContentRef.current += contentLine
+            }
+            // If line doesn't start with "data:", it's a continuation that should have been part of the data
+            // This shouldn't happen with proper SSE, but we'll keep it as-is just in case
+            else if (line.trim() && !line.startsWith(':')) {
+              // This is likely a non-SSE line, which we'll preserve
+              streamingContentRef.current += '\n' + line
+            }
+          }
+
+          ReactDOM.flushSync(() => {
+            setChatLogs(prev =>
+              prev.map(chat => {
+                if (chat.id !== activeChatId) return chat
+                return {
+                  ...chat,
+                  messages: chat.messages.map(msg =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: streamingContentRef.current }
+                      : msg
+                  )
+                }
+              })
+            )
+          })
+
+          if (chatHistoryRef.current) {
+            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
+          }
+
+          if (doneStreaming) break
         }
 
         if (doneStreaming) break
