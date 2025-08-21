@@ -113,50 +113,33 @@ const HomePage = () => {
         if (done) break
 
         const rawChunk = decoder.decode(value, { stream: true })
-        
-        // DEBUGGING: Log raw chunk
-        console.log('DEBUG - Raw chunk:', JSON.stringify(rawChunk))
-        
         buffer += rawChunk
-        
-        // DEBUGGING: Log buffer state
-        console.log('DEBUG - Buffer after adding chunk:', JSON.stringify(buffer))
 
-        // Split by SSE event boundary (blank line)
+        // Split by SSE event boundary (double newline)
         const events = buffer.split('\n\n')
         buffer = events.pop() || ''
 
         for (const evt of events) {
-          // DEBUGGING: Log each event
-          console.log('DEBUG - Processing event:', JSON.stringify(evt))
+          if (!evt.trim()) continue // Skip empty events
           
-          // Process each line in the event
+          // Process all lines in the event
           const lines = evt.split('\n')
           
           for (const line of lines) {
             // Only process lines that start with "data: "
             if (line.startsWith('data: ')) {
-              const content = line.slice(6) // Remove "data: " prefix
-              
-              // DEBUGGING: Log extracted content
-              console.log('DEBUG - Extracted content:', JSON.stringify(content))
+              const content = line.substring(6) // Use substring to preserve exact content
               
               // Check for sentinel
               if (content === '[DONE]') {
                 doneStreaming = true
-                console.log('DEBUG - Found [DONE] sentinel')
                 break
               }
               
-              // Add content to stream
+              // Add content exactly as received (including newlines in the content)
               streamingContentRef.current += content
-              
-              // DEBUGGING: Log accumulated content
-              console.log('DEBUG - Total accumulated content:', JSON.stringify(streamingContentRef.current))
-            } else if (line.trim()) {
-              // DEBUGGING: Log non-data lines
-              console.log('DEBUG - Non-data line found:', JSON.stringify(line))
             }
+            // Ignore lines that don't start with "data: "
           }
 
           // Update UI with accumulated content
