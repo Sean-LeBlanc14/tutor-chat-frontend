@@ -133,8 +133,13 @@ const HomePage = () => {
                 continue
               }
 
-              // Add to content stream exactly as is
-              streamingContentRef.current += contentLine
+              // IMPORTANT: If contentLine is empty, it means the server sent "data: \n"
+              // We need to preserve that newline!
+              if (contentLine === '') {
+                streamingContentRef.current += '\n'
+              } else {
+                streamingContentRef.current += contentLine
+              }
             }
             // If line doesn't start with "data:", it's a continuation that should have been part of the data
             // This shouldn't happen with proper SSE, but we'll keep it as-is just in case
