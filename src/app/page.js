@@ -125,9 +125,16 @@ const HomePage = () => {
           for (const line of lines) {
             console.log(`Processing line: "${line}", starts with data: ${line.startsWith('data: ')}`);
             
+            // FIXED: Handle completely empty lines as newlines
+            if (line === '') {
+              console.log('Empty line detected - adding newline');
+              streamingContentRef.current += '\n';
+              continue;
+            }
+            
             // Check if line starts with "data: "
             if (line.startsWith('data: ')) {
-              // Extract everything after "data: " INCLUDING newlines and spaces
+              // Extract everything after "data: "
               const contentLine = line.substring(6);
               
               // Check for sentinel
@@ -142,8 +149,12 @@ const HomePage = () => {
                 console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`);
               }
 
-              // Append exactly what the server sends - no processing needed
-              streamingContentRef.current += contentLine;
+              // Handle empty data lines as newlines, or append content
+              if (contentLine === '') {
+                streamingContentRef.current += '\n';
+              } else {
+                streamingContentRef.current += contentLine;
+              }
             }
             // If line doesn't start with "data:", it might be a continuation
             else if (line.trim() && !line.startsWith(':')) {
