@@ -1,4 +1,4 @@
-// Fixed page.js with direct DOM streaming (no line drops; SSE-safe)
+// Fixed page.js with newline debugging
 "use client"
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -107,6 +107,7 @@ const HomePage = () => {
 
       let buffer = ''
       let doneStreaming = false
+      let debugCounter = 0 // Add counter for debugging
 
       while (true) {
         const { done, value } = await reader.read()
@@ -133,18 +134,18 @@ const HomePage = () => {
                 continue
               }
 
-              // IMPORTANT: If contentLine is empty, it means the server sent "data: \n"
-              // We need to preserve that newline!
-              if (contentLine === '') {
-                streamingContentRef.current += '\n'
-              } else {
-                streamingContentRef.current += contentLine
+              // Debug logging to see what we're getting
+              debugCounter++
+              if (debugCounter <= 20 || contentLine === '') { // Log first 20 and all empty lines
+                console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`)
               }
+
+              // Always append the content as-is, preserving any newlines
+              streamingContentRef.current += contentLine
             }
-            // If line doesn't start with "data:", it's a continuation that should have been part of the data
-            // This shouldn't happen with proper SSE, but we'll keep it as-is just in case
+            // If line doesn't start with "data:", it might be a continuation
             else if (line.trim() && !line.startsWith(':')) {
-              // This is likely a non-SSE line, which we'll preserve
+              console.log(`Non-data line found: "${line}"`)
               streamingContentRef.current += '\n' + line
             }
           }
@@ -174,6 +175,10 @@ const HomePage = () => {
 
         if (doneStreaming) break
       }
+
+      // Log final content structure
+      console.log('Final content newline count:', (streamingContentRef.current.match(/\n/g) || []).length)
+      console.log('Content has double newlines:', streamingContentRef.current.includes('\n\n'))
 
       // Final update
       setChatLogs(prev =>
