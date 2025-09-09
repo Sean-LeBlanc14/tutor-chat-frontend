@@ -140,10 +140,23 @@ const HomePage = () => {
                 console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`)
               }
 
-              // Preserve content exactly as sent by server, including empty lines as newlines
+              // Handle spacing intelligently
               if (contentLine === '') {
                 streamingContentRef.current += '\n'
               } else {
+                const currentContent = streamingContentRef.current
+                const needsSpace = currentContent.length > 0 && 
+                                   !currentContent.endsWith(' ') && 
+                                   !currentContent.endsWith('\n') &&
+                                   !contentLine.startsWith(' ') &&
+                                   // Add space before numbers that start list items
+                                   (contentLine.match(/^\d+\./) || 
+                                    // Add space after sentence endings
+                                    (currentContent.match(/[.!?:]$/) && !contentLine.match(/^[.!?,:;]/)))
+                
+                if (needsSpace) {
+                  streamingContentRef.current += ' '
+                }
                 streamingContentRef.current += contentLine
               }
             }
