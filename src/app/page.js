@@ -123,8 +123,6 @@ const HomePage = () => {
           const lines = evt.split('\n');
 
           for (const line of lines) {
-            console.log(`Processing line: "${line}", starts with data: ${line.startsWith('data: ')}`);
-            
             // Check if line starts with "data: "
             if (line.startsWith('data: ')) {
               // Extract everything after "data: " INCLUDING newlines and spaces
