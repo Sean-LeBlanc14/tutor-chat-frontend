@@ -140,21 +140,10 @@ const HomePage = () => {
                 console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`)
               }
 
-              // Add space if needed between tokens
+              // Preserve content exactly as sent by server, including empty lines as newlines
               if (contentLine === '') {
                 streamingContentRef.current += '\n'
               } else {
-                // Check if we need to add a space before this content
-                const currentContent = streamingContentRef.current
-                const needsSpace = currentContent.length > 0 && 
-                                   !currentContent.endsWith(' ') && 
-                                   !currentContent.endsWith('\n') &&
-                                   !contentLine.startsWith(' ') &&
-                                   !contentLine.match(/^[.,:;!?]/)
-                
-                if (needsSpace) {
-                  streamingContentRef.current += ' '
-                }
                 streamingContentRef.current += contentLine
               }
             }
