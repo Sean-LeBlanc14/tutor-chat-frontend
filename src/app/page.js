@@ -140,8 +140,23 @@ const HomePage = () => {
                 console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`)
               }
 
-              // Always append the content as-is, preserving any newlines
-              streamingContentRef.current += contentLine
+              // Add space if needed between tokens
+              if (contentLine === '') {
+                streamingContentRef.current += '\n'
+              } else {
+                // Check if we need to add a space before this content
+                const currentContent = streamingContentRef.current
+                const needsSpace = currentContent.length > 0 && 
+                                   !currentContent.endsWith(' ') && 
+                                   !currentContent.endsWith('\n') &&
+                                   !contentLine.startsWith(' ') &&
+                                   !contentLine.match(/^[.,:;!?]/)
+                
+                if (needsSpace) {
+                  streamingContentRef.current += ' '
+                }
+                streamingContentRef.current += contentLine
+              }
             }
             // If line doesn't start with "data:", it might be a continuation
             else if (line.trim() && !line.startsWith(':')) {
