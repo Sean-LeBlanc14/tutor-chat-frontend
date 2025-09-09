@@ -140,8 +140,26 @@ const HomePage = () => {
                 console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`);
               }
 
-              // Just append exactly what the server sends
-              streamingContentRef.current += contentLine;
+              // Just append exactly what the server sends, with minimal formatting fixes
+              if (contentLine === '') {
+                streamingContentRef.current += '\n';
+              } else {
+                // Check if we need to add newline before numbered list items
+                if (streamingContentRef.current.length > 0 && 
+                    !streamingContentRef.current.endsWith('\n') && 
+                    !streamingContentRef.current.endsWith(' ') &&
+                    contentLine.match(/^\d+\.\s/)) {
+                  streamingContentRef.current += '\n';
+                }
+                // Check if we need space before bullet points
+                else if (streamingContentRef.current.length > 0 && 
+                         !streamingContentRef.current.endsWith('\n') && 
+                         !streamingContentRef.current.endsWith(' ') &&
+                         contentLine.match(/^\*/)) {
+                  streamingContentRef.current += ' ';
+                }
+                streamingContentRef.current += contentLine;
+              }
             }
             // If line doesn't start with "data:", it might be a continuation
             else if (line.trim() && !line.startsWith(':')) {
