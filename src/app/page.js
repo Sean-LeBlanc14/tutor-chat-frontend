@@ -170,7 +170,14 @@ const HomePage = () => {
             // If line doesn't start with "data:", it might be a continuation
             else if (line.trim() && !line.startsWith(':')) {
               console.log(`Non-data line found: "${line}"`);
-              streamingContentRef.current += '\n' + line;
+              // Only add newline if content doesn't already end with one
+              if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                console.log('Adding newline before non-data line');
+                streamingContentRef.current += '\n' + line;
+              } else {
+                console.log('Content already ends with newline, appending non-data line directly');
+                streamingContentRef.current += line;
+              }
             }
           }
 
