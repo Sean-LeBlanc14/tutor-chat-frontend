@@ -125,19 +125,6 @@ const HomePage = () => {
           for (const line of lines) {
             console.log(`Processing line: "${line}", starts with data: ${line.startsWith('data: ')}`);
             
-            // FIXED: Handle completely empty lines as newlines
-            if (line === '') {
-              console.log('Empty line detected - checking if newline needed');
-              // Only add newline if the last character isn't already a newline
-              if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
-                console.log('Adding newline for empty line');
-                streamingContentRef.current += '\n';
-              } else {
-                console.log('Skipping newline - content already ends with newline or is empty');
-              }
-              continue;
-            }
-            
             // Check if line starts with "data: "
             if (line.startsWith('data: ')) {
               // Extract everything after "data: "
@@ -151,15 +138,33 @@ const HomePage = () => {
 
               // Debug logging to see what we're getting
               debugCounter++;
-              if (debugCounter <= 20 || contentLine === '') { // Log first 20 and all empty lines
+              if (debugCounter <= 20 || contentLine === '') {
                 console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`);
               }
 
               // Handle empty data lines as newlines, or append content
               if (contentLine === '') {
-                streamingContentRef.current += '\n';
+                console.log('Empty data line detected - checking if newline needed');
+                // Only add newline if the last character isn't already a newline
+                if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                  console.log('Adding newline for empty data line');
+                  streamingContentRef.current += '\n';
+                } else {
+                  console.log('Skipping newline - content already ends with newline');
+                }
               } else {
                 streamingContentRef.current += contentLine;
+              }
+            }
+            // Handle completely empty lines (non-data lines) - but be more careful
+            else if (line === '') {
+              console.log('Empty non-data line detected - checking if newline needed');
+              // Only add newline if the last character isn't already a newline
+              if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                console.log('Adding newline for empty non-data line');
+                streamingContentRef.current += '\n';
+              } else {
+                console.log('Skipping newline - content already ends with newline or is empty');
               }
             }
             // If line doesn't start with "data:", it might be a continuation
