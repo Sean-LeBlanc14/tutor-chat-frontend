@@ -1,38 +1,4 @@
-/* components/ChatMessage.css - Updated with markdown styles */
-
-/* Format toggle button */
-.format-toggle-btn {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--color-bg-tertiary);
-    border: 2px solid var(--color-border);
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow);
-    transition: var(--transition);
-    z-index: 10;
-    color: var(--color-text-secondary);
-}
-
-.format-toggle-btn:hover {
-    border-color: var(--color-accent);
-    background: var(--color-accent-light);
-    transform: scale(1.1);
-    color: var(--color-accent);
-}
-
-.format-toggle-btn.active {
-    background: var(--color-accent-light);
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-}
+/* components/ChatMessage.css - Clean markdown styles without toggle */
 
 /* Chat output (plain text rendering) */
 .chat-output {
@@ -175,24 +141,5 @@
     }
     51%, 100% {
         opacity: 0;
-    }
-}
-
-/* Responsive adjustments for the format button */
-@media (max-width: 768px) {
-    .format-toggle-btn {
-        width: 24px;
-        height: 24px;
-        font-size: 10px;
-        top: -6px;
-        right: -6px;
-    }
-}
-
-@media (max-width: 480px) {
-    .format-toggle-btn {
-        width: 20px;
-        height: 20px;
-        font-size: 9px;
     }
 }

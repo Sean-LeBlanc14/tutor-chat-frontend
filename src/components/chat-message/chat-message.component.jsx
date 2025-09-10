@@ -1,41 +1,14 @@
 // components/ChatMessage.jsx
-import React, { useState } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import '@/components/chat-message/chat-message.styles.css';
 
 const ChatMessage = ({ message, isStreaming = false }) => {
-    const [showFormatted, setShowFormatted] = useState(true);
-
-    const toggleFormat = () => {
-        setShowFormatted(!showFormatted);
-    };
-
-    // Check if message content has markdown formatting
-    const hasMarkdown = message?.content && (
-        message.content.includes('**') || 
-        message.content.includes('*') || 
-        message.content.match(/^\s*\d+\.\s/m) || 
-        message.content.match(/^\s*[\*\-\+]\s/m) ||
-        message.content.includes('#')
-    );
-
     return (
         <div className={`chat-message ${message.role}`} style={{ position: 'relative' }}>
-        {/* Format toggle button - only show if content has markdown */}
-        {hasMarkdown && (
-            <button 
-            className={`format-toggle-btn ${showFormatted ? 'active' : ''}`}
-            onClick={toggleFormat}
-            title={showFormatted ? 'Show raw text' : 'Show formatted text'}
-            >
-            {showFormatted ? 'M' : 'T'}
-            </button>
-        )}
-
         <div className="chat-output">
-            {showFormatted && hasMarkdown ? (
             <ReactMarkdown
-                components={{
+            components={{
                 // Customize rendering to match your existing styles
                 p: ({ children }) => <div className="markdown-paragraph">{children}</div>,
                 strong: ({ children }) => <strong className="markdown-bold">{children}</strong>,
@@ -52,15 +25,10 @@ const ChatMessage = ({ message, isStreaming = false }) => {
                 code: ({ children }) => <code className="markdown-code">{children}</code>,
                 pre: ({ children }) => <pre className="markdown-pre">{children}</pre>,
                 blockquote: ({ children }) => <blockquote className="markdown-blockquote">{children}</blockquote>,
-                }}
+            }}
             >
-                {message?.content ?? ''}
+            {message?.content ?? ''}
             </ReactMarkdown>
-            ) : (
-            <div style={{ whiteSpace: 'pre-wrap' }}>
-                {message?.content ?? ''}
-            </div>
-            )}
         </div>
 
         {isStreaming && (
