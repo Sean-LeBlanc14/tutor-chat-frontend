@@ -127,8 +127,14 @@ const HomePage = () => {
             
             // FIXED: Handle completely empty lines as newlines
             if (line === '') {
-              console.log('Empty line detected - adding newline');
-              streamingContentRef.current += '\n';
+              console.log('Empty line detected - checking if newline needed');
+              // Only add newline if the last character isn't already a newline
+              if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                console.log('Adding newline for empty line');
+                streamingContentRef.current += '\n';
+              } else {
+                console.log('Skipping newline - content already ends with newline or is empty');
+              }
               continue;
             }
             
