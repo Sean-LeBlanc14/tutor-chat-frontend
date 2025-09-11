@@ -1,7 +1,8 @@
-// Fixed sandbox-chat.component.jsx with proper backend API calls
+// Fixed sandbox-chat.component.jsx with proper streaming logic from regular chat
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import * as ReactDOM from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/lib/authContext'
 import { useRole } from '@/hooks/useRole'
@@ -9,6 +10,7 @@ import SearchBox from '../search-box/search-box.component'
 import Spinner from '../spinner/spinner.component'
 import SandboxManager from '../sandbox-manager/sandbox-manager.component'
 import Sidebar from '../sidebar/sidebar.component'
+import ChatMessage from '../chat-message/chat-message.component'
 import { API_ENDPOINTS, apiRequest } from '@/app/utils/api'
 import { sanitizeInput, validateInput } from '@/app/utils/security'
 
@@ -21,11 +23,13 @@ const SandBoxChat = () => {
     const [query, setQuery] = useState('')
     const [loading, setLoading] = useState(false)
     const [hasAsked, setHasAsked] = useState(false)
-    const [displayedText, setDisplayedText] = useState('')
     const [chatLogs, setChatLogs] = useState([])
     const [activeChatId, setActiveChatId] = useState(null)
+    const [streamingMessageId, setStreamingMessageId] = useState(null)
 
     const chatHistoryRef = useRef(null)
+    const streamingContentRef = useRef('')
+
     const activeChat = chatLogs.find(chat => chat.id === activeChatId)
     const messages = activeChat?.messages || []
 
@@ -113,79 +117,67 @@ const SandBoxChat = () => {
         setQuery(e.target.value)
     }
 
-    // FIXED: Use API_ENDPOINTS instead of hardcoded URL
     const addMessageToActive = async (role, content) => {
-
-        // Check if we have an active chat session
-        if (!activeChatId) {
-            console.error('No active chat session. Cannot save message.');
-            return;
-        }
-
-        // Add message to local state immediately for better UX
         const newMessage = {
             id: crypto.randomUUID(),
             role,
-            content,
+            content: sanitizeInput(content),
             created_at: new Date().toISOString()
-        };
+        }
 
-        // Update local messages
         setChatLogs(prev =>
-            prev.map(chat =>
-                chat.id === activeChatId
-                    ? { ...chat, messages: [...chat.messages, newMessage] }
-                    : chat
+            prev.map(chat => chat.id === activeChatId
+                ? { ...chat, messages: [...chat.messages, newMessage] }
+                : chat
             )
-        );
+        )
 
-        // FIXED: Use apiRequest with proper backend URL
-        try {
-            const response = await apiRequest(API_ENDPOINTS.sandbox.sessionMessages(activeChatId), {
-                method: 'POST',
-                body: JSON.stringify({
-                    role: role,
-                    content: content
+        if (user?.email && activeChatId) {
+            try {
+                const response = await apiRequest(API_ENDPOINTS.sandbox.sessionMessages(activeChatId), {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        role: role,
+                        content: newMessage.content
+                    })
                 })
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
                 
-                // Update the message with the server-generated ID if needed
-                setChatLogs(prev =>
-                    prev.map(chat =>
-                        chat.id === activeChatId
-                            ? {
-                                ...chat,
-                                messages: chat.messages.map(msg =>
-                                    msg.id === newMessage.id ? { ...msg, id: result.id } : msg
-                                )
-                            }
-                            : chat
-                    )
-                );
-            } else {
-                const errorData = await response.text();
-                console.error('Backend error response:', errorData);
-                
-                try {
-                    const jsonError = JSON.parse(errorData);
-                    console.error('Parsed error:', jsonError);
+                if (response.ok) {
+                    const result = await response.json()
                     
-                    // Handle specific errors
-                    if (jsonError.detail === 'Session not found') {
-                        await startNewChat();
+                    // Update the message with the server-generated ID if needed
+                    setChatLogs(prev =>
+                        prev.map(chat =>
+                            chat.id === activeChatId
+                                ? {
+                                    ...chat,
+                                    messages: chat.messages.map(msg =>
+                                        msg.id === newMessage.id ? { ...msg, id: result.id } : msg
+                                    )
+                                }
+                                : chat
+                        )
+                    )
+                } else {
+                    const errorData = await response.text()
+                    console.error('Backend error response:', errorData)
+                    
+                    try {
+                        const jsonError = JSON.parse(errorData)
+                        console.error('Parsed error:', jsonError)
+                        
+                        // Handle specific errors
+                        if (jsonError.detail === 'Session not found') {
+                            await startNewChat()
+                        }
+                    } catch (e) {
+                        console.error('Raw error text:', errorData)
                     }
-                } catch (e) {
-                    console.error('Raw error text:', errorData);
                 }
+                
+            } catch (error) {
+                console.error('Network error saving message:', error)
             }
-            
-        } catch (error) {
-            console.error('Network error saving message:', error);
-            console.error('Error type:', error.constructor.name);
-            console.error('Error message:', error.message);
         }
     }
 
@@ -196,6 +188,8 @@ const SandBoxChat = () => {
             return
         }
 
+        const originalTitle = chatLogs.find(chat => chat.id === sessionId)?.title
+
         // Update local state immediately
         setChatLogs(prev =>
             prev.map(chat =>
@@ -203,7 +197,6 @@ const SandBoxChat = () => {
             )
         )
 
-        // FIXED: Use proper endpoint for updating session
         try {
             const response = await apiRequest(API_ENDPOINTS.sandbox.updateSession(sessionId), {
                 method: 'PUT',
@@ -211,30 +204,42 @@ const SandBoxChat = () => {
             })
 
             if (!response.ok) {
+                // Revert on failure
+                setChatLogs(prev =>
+                    prev.map(chat =>
+                        chat.id === sessionId ? { ...chat, title: originalTitle } : chat
+                    )
+                )
                 console.error('Failed to rename session')
             }
         } catch (error) {
+            // Revert on error
+            setChatLogs(prev =>
+                prev.map(chat =>
+                    chat.id === sessionId ? { ...chat, title: originalTitle } : chat
+                )
+            )
             console.error('Error renaming session:', error)
         }
     }
 
     const handleDeleteSession = async (sessionId) => {
         // Update local state immediately
-        const updated = chatLogs.filter(chat => chat.id !== sessionId)
+        setChatLogs(prev => {
+            const updated = prev.filter(chat => chat.id !== sessionId)
 
-        if (sessionId === activeChatId) {
-            if (updated.length > 0) {
-                setActiveChatId(updated[0].id)
-                setHasAsked(updated[0].messages.length > 0)
-            } else {
-                setActiveChatId(null)
-                setHasAsked(false)
+            if (sessionId === activeChatId) {
+                if (updated.length > 0) {
+                    setActiveChatId(updated[0].id)
+                    setHasAsked(updated[0].messages.length > 0)
+                } else {
+                    setActiveChatId(null)
+                    setHasAsked(false)
+                }
             }
-        }
+            return updated
+        })
 
-        setChatLogs(updated)
-
-        // FIXED: Use proper endpoint for deleting session
         try {
             const response = await apiRequest(API_ENDPOINTS.sandbox.deleteSession(sessionId), {
                 method: 'DELETE'
@@ -259,14 +264,12 @@ const SandBoxChat = () => {
             return
         }
 
-        // Don't save user message here - the streaming endpoint will handle it
+        addMessageToActive('user', userQuery)
         setLoading(true)
-        setDisplayedText('')
         setHasAsked(true)
         setQuery('')
 
         try {
-            // FIXED: Use sandbox streaming endpoint and simplified payload
             const payload = {
                 role: 'user',
                 content: userQuery
@@ -282,27 +285,10 @@ const SandBoxChat = () => {
                 throw new Error('Failed to get response')
             }
 
-            // Add user message to UI immediately
-            const userMessage = {
-                id: crypto.randomUUID(),
-                role: 'user',
-                content: userQuery,
-                created_at: new Date().toISOString()
-            }
-
-            setChatLogs(prev =>
-                prev.map(chat => {
-                    if (chat.id !== activeChatId) return chat
-                    return { ...chat, messages: [...chat.messages, userMessage] }
-                })
-            )
-
-            // Handle streaming response
             const reader = response.body.getReader()
             const decoder = new TextDecoder()
-            let fullResponse = ''
+            streamingContentRef.current = ''
 
-            // Create assistant message that we'll update in real-time
             const assistantMessage = {
                 id: crypto.randomUUID(),
                 role: 'assistant',
@@ -310,32 +296,93 @@ const SandBoxChat = () => {
                 created_at: new Date().toISOString()
             }
 
-            // Add empty assistant message to UI
             setChatLogs(prev =>
-                prev.map(chat => {
-                    if (chat.id !== activeChatId) return chat
-                    return { ...chat, messages: [...chat.messages, assistantMessage] }
-                })
+                prev.map(chat => chat.id === activeChatId
+                    ? { ...chat, messages: [...chat.messages, assistantMessage] }
+                    : chat
+                )
             )
+            setStreamingMessageId(assistantMessage.id)
+            setLoading(false)
 
-            setLoading(false) // Stop loading spinner, start streaming
+            // FIXED: Use the same SSE parsing logic as regular chat
+            let buffer = ''
+            let doneStreaming = false
+            let debugCounter = 0
 
-            // Read stream
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
 
-                const chunk = decoder.decode(value)
-                const lines = chunk.split('\n')
+                buffer += decoder.decode(value, { stream: true })
 
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const token = line.substring(6)
-                        if (token === '[DONE]') break
+                // Split by SSE event boundary (blank line)
+                const events = buffer.split('\n\n')
+                buffer = events.pop() || ''
+
+                for (const evt of events) {
+                    const lines = evt.split('\n')
+
+                    for (const line of lines) {
+                        console.log(`Processing line: "${line}", starts with data: ${line.startsWith('data: ')}`)
                         
-                        fullResponse += token
+                        // Check if line starts with "data: "
+                        if (line.startsWith('data: ')) {
+                            // Extract everything after "data: "
+                            const contentLine = line.substring(6)
+                            
+                            // Check for sentinel
+                            if (contentLine === '[DONE]') {
+                                doneStreaming = true
+                                continue
+                            }
 
-                        // Update assistant message in real-time
+                            // Debug logging to see what we're getting
+                            debugCounter++
+                            if (debugCounter <= 20 || contentLine === '') {
+                                console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`)
+                            }
+
+                            // Handle empty data lines as newlines, or append content
+                            if (contentLine === '') {
+                                console.log('Empty data line detected - checking if newline needed')
+                                // Only add newline if the last character isn't already a newline
+                                if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                                    console.log('Adding newline for empty data line')
+                                    streamingContentRef.current += '\n'
+                                } else {
+                                    console.log('Skipping newline - content already ends with newline')
+                                }
+                            } else {
+                                streamingContentRef.current += contentLine
+                            }
+                        }
+                        // Handle completely empty lines (non-data lines) - but be more careful
+                        else if (line === '') {
+                            console.log('Empty non-data line detected - checking if newline needed')
+                            // Only add newline if the last character isn't already a newline
+                            if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                                console.log('Adding newline for empty non-data line')
+                                streamingContentRef.current += '\n'
+                            } else {
+                                console.log('Skipping newline - content already ends with newline or is empty')
+                            }
+                        }
+                        // If line doesn't start with "data:", it might be a continuation
+                        else if (line.trim() && !line.startsWith(':')) {
+                            console.log(`Non-data line found: "${line}"`)
+                            // Only add newline if content doesn't already end with one
+                            if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
+                                console.log('Adding newline before non-data line')
+                                streamingContentRef.current += '\n' + line
+                            } else {
+                                console.log('Content already ends with newline, appending non-data line directly')
+                                streamingContentRef.current += line
+                            }
+                        }
+                    }
+
+                    ReactDOM.flushSync(() => {
                         setChatLogs(prev =>
                             prev.map(chat => {
                                 if (chat.id !== activeChatId) return chat
@@ -343,18 +390,56 @@ const SandBoxChat = () => {
                                     ...chat,
                                     messages: chat.messages.map(msg =>
                                         msg.id === assistantMessage.id
-                                            ? { ...msg, content: fullResponse }
+                                            ? { ...msg, content: streamingContentRef.current }
                                             : msg
                                     )
                                 }
                             })
                         )
+                    })
 
-                        // Auto-scroll to bottom
-                        if (chatHistoryRef.current) {
-                            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
-                        }
+                    if (chatHistoryRef.current) {
+                        chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight
                     }
+
+                    if (doneStreaming) break
+                }
+
+                if (doneStreaming) break
+            }
+
+            // Log final content structure
+            console.log('Final content newline count:', (streamingContentRef.current.match(/\n/g) || []).length)
+            console.log('Content has double newlines:', streamingContentRef.current.includes('\n\n'))
+
+            // Final update
+            setChatLogs(prev =>
+                prev.map(chat => {
+                    if (chat.id !== activeChatId) return chat
+                    return {
+                        ...chat,
+                        messages: chat.messages.map(msg =>
+                            msg.id === assistantMessage.id
+                                ? { ...msg, content: streamingContentRef.current }
+                                : msg
+                        )
+                    }
+                })
+            )
+            setStreamingMessageId(null)
+
+            // Save assistant message
+            if (user?.email && activeChatId && streamingContentRef.current) {
+                try {
+                    await apiRequest(API_ENDPOINTS.sandbox.sessionMessages(activeChatId), {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            role: 'assistant',
+                            content: streamingContentRef.current
+                        })
+                    })
+                } catch (error) {
+                    console.error('Error saving assistant message:', error)
                 }
             }
 
@@ -364,58 +449,17 @@ const SandBoxChat = () => {
             
             if (error.message.includes('Too many requests')) {
                 errorMessage = 'Too many requests. Please wait a moment and try again.'
+            } else if (error.message.includes('Authentication')) {
+                errorMessage = 'Please log in again.'
+                router.push('/login')
+                return
             }
             
-            // Add error message to UI
-            const errorAssistantMessage = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: errorMessage,
-                created_at: new Date().toISOString()
-            }
-
-            setChatLogs(prev =>
-                prev.map(chat => {
-                    if (chat.id !== activeChatId) return chat
-                    return { ...chat, messages: [...chat.messages, errorAssistantMessage] }
-                })
-            )
+            addMessageToActive('assistant', errorMessage)
         } finally {
             setLoading(false)
         }
     }
-
-    /*
-    useEffect(() => {
-        if (!loading && messages.length > 0) {
-            const last = messages[messages.length - 1]
-            if (last.role !== 'assistant') return
-
-            const fullText = last.content
-            let currentText = ''
-            setDisplayedText('')
-
-            const baseSpeed = fullText.length > 500 ? 3 : 5
-            let charIndex = 0
-
-            const interval = setInterval(() => {
-                charIndex += baseSpeed
-                currentText = fullText.slice(0, charIndex)
-                setDisplayedText(currentText)
-
-                if (charIndex >= fullText.length) {
-                    clearInterval(interval)
-                    setDisplayedText(fullText)
-                    if (chatHistoryRef.current) {
-                        chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHistory
-                    }
-                }
-            }, 20)
-
-            return () => clearInterval(interval)
-        }
-    }, [loading, messages])
-    */
 
     if (roleLoading || !isAdmin) return null
 
@@ -428,7 +472,8 @@ const SandBoxChat = () => {
                     onNewChat={startNewChat}
                     onSelectChat={(sessionId) => {
                         setActiveChatId(sessionId)
-                        setHasAsked(true)
+                        const selectedChat = chatLogs.find(chat => chat.id === sessionId)
+                        setHasAsked(selectedChat?.messages.length > 0)
                     }}
                     onRenameChat={handleRenameSession} 
                     onDeleteChat={handleDeleteSession} 
@@ -480,17 +525,22 @@ const SandBoxChat = () => {
 
                     {hasAsked && (
                         <div className="chat-history" ref={chatHistoryRef}>
-                            {messages.map((msg, index) => (
-                                <div key={index} className="chat-line">
-                                    <div className={`chat-bubble-wrapper ${msg.role}`}>
-                                        <div className={`chat-message ${msg.role}`}>
-                                            {msg.role === 'assistant' && index === messages.length - 1 && !loading ?
-                                                msg.content  // Show the actual content, not displayedText
-                                            : msg.content}
+                            {messages.map((msg, index) => {
+                                const userQuestion = msg.role === 'assistant' && index > 0
+                                    ? messages[index - 1]?.content || ''
+                                    : ''
+                                return (
+                                    <div key={msg.id || index} className='chat-line'>
+                                        <div className={`chat-bubble-wrapper ${msg.role}`}>
+                                            <ChatMessage
+                                                message={msg}
+                                                originalQuestion={userQuestion}
+                                                isStreaming={msg.id === streamingMessageId}
+                                            />
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                             {loading && (
                                 <div className="chat-line">
                                     <div className="chat-bubble-wrapper assistant">
