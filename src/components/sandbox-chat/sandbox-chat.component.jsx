@@ -1,4 +1,4 @@
-// Fixed sandbox-chat.component.jsx with proper streaming logic from regular chat
+// Fixed sandbox-chat.component.jsx - prevents message duplication
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -54,6 +54,7 @@ const SandBoxChat = () => {
             }
 
             const sessions = await response.json()
+            console.log('Raw sessions from backend:', sessions) // Debug logging
 
             if (sessions.length > 0) {
                 setChatLogs(sessions)
@@ -132,7 +133,8 @@ const SandBoxChat = () => {
             )
         )
 
-        if (user?.email && activeChatId) {
+        // Only save manually added messages (not streaming messages)
+        if (user?.email && activeChatId && role !== 'streaming') {
             try {
                 const response = await apiRequest(API_ENDPOINTS.sandbox.sessionMessages(activeChatId), {
                     method: 'POST',
@@ -161,18 +163,6 @@ const SandBoxChat = () => {
                 } else {
                     const errorData = await response.text()
                     console.error('Backend error response:', errorData)
-                    
-                    try {
-                        const jsonError = JSON.parse(errorData)
-                        console.error('Parsed error:', jsonError)
-                        
-                        // Handle specific errors
-                        if (jsonError.detail === 'Session not found') {
-                            await startNewChat()
-                        }
-                    } catch (e) {
-                        console.error('Raw error text:', errorData)
-                    }
                 }
                 
             } catch (error) {
@@ -264,7 +254,7 @@ const SandBoxChat = () => {
             return
         }
 
-        addMessageToActive('user', userQuery)
+        // DON'T add user message here - let backend handle it through streaming
         setLoading(true)
         setHasAsked(true)
         setQuery('')
@@ -284,6 +274,22 @@ const SandBoxChat = () => {
             if (!response.ok) {
                 throw new Error('Failed to get response')
             }
+
+            // After successful request, create user message in UI
+            // (backend has already saved it)
+            const userMessage = {
+                id: crypto.randomUUID(),
+                role: 'user',
+                content: userQuery,
+                created_at: new Date().toISOString()
+            }
+
+            setChatLogs(prev =>
+                prev.map(chat => chat.id === activeChatId
+                    ? { ...chat, messages: [...chat.messages, userMessage] }
+                    : chat
+                )
+            )
 
             const reader = response.body.getReader()
             const decoder = new TextDecoder()
@@ -324,8 +330,6 @@ const SandBoxChat = () => {
                     const lines = evt.split('\n')
 
                     for (const line of lines) {
-                        console.log(`Processing line: "${line}", starts with data: ${line.startsWith('data: ')}`)
-                        
                         // Check if line starts with "data: "
                         if (line.startsWith('data: ')) {
                             // Extract everything after "data: "
@@ -337,46 +341,29 @@ const SandBoxChat = () => {
                                 continue
                             }
 
-                            // Debug logging to see what we're getting
-                            debugCounter++
-                            if (debugCounter <= 20 || contentLine === '') {
-                                console.log(`Line ${debugCounter}: data content = "${contentLine}" (empty: ${contentLine === ''})`)
-                            }
-
                             // Handle empty data lines as newlines, or append content
                             if (contentLine === '') {
-                                console.log('Empty data line detected - checking if newline needed')
                                 // Only add newline if the last character isn't already a newline
                                 if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
-                                    console.log('Adding newline for empty data line')
                                     streamingContentRef.current += '\n'
-                                } else {
-                                    console.log('Skipping newline - content already ends with newline')
                                 }
                             } else {
                                 streamingContentRef.current += contentLine
                             }
                         }
-                        // Handle completely empty lines (non-data lines) - but be more careful
+                        // Handle completely empty lines (non-data lines)
                         else if (line === '') {
-                            console.log('Empty non-data line detected - checking if newline needed')
                             // Only add newline if the last character isn't already a newline
                             if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
-                                console.log('Adding newline for empty non-data line')
                                 streamingContentRef.current += '\n'
-                            } else {
-                                console.log('Skipping newline - content already ends with newline or is empty')
                             }
                         }
                         // If line doesn't start with "data:", it might be a continuation
                         else if (line.trim() && !line.startsWith(':')) {
-                            console.log(`Non-data line found: "${line}"`)
                             // Only add newline if content doesn't already end with one
                             if (streamingContentRef.current && !streamingContentRef.current.endsWith('\n')) {
-                                console.log('Adding newline before non-data line')
                                 streamingContentRef.current += '\n' + line
                             } else {
-                                console.log('Content already ends with newline, appending non-data line directly')
                                 streamingContentRef.current += line
                             }
                         }
@@ -408,10 +395,6 @@ const SandBoxChat = () => {
                 if (doneStreaming) break
             }
 
-            // Log final content structure
-            console.log('Final content newline count:', (streamingContentRef.current.match(/\n/g) || []).length)
-            console.log('Content has double newlines:', streamingContentRef.current.includes('\n\n'))
-
             // Final update
             setChatLogs(prev =>
                 prev.map(chat => {
@@ -428,20 +411,7 @@ const SandBoxChat = () => {
             )
             setStreamingMessageId(null)
 
-            // Save assistant message
-            if (user?.email && activeChatId && streamingContentRef.current) {
-                try {
-                    await apiRequest(API_ENDPOINTS.sandbox.sessionMessages(activeChatId), {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            role: 'assistant',
-                            content: streamingContentRef.current
-                        })
-                    })
-                } catch (error) {
-                    console.error('Error saving assistant message:', error)
-                }
-            }
+            // No need to save assistant message here - backend already saved it during streaming
 
         } catch (error) {
             console.error('Error:', error)
