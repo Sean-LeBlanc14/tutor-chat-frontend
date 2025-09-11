@@ -1,4 +1,4 @@
-// Fixed sandbox-chat.component.jsx - prevents message duplication
+// Fixed sandbox-chat.component.jsx - prevents message duplication and fixes environment switching
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -47,6 +47,9 @@ const SandBoxChat = () => {
 
     const loadSandboxChats = async () => {
         try {
+            console.log('DEBUG: Loading sessions for environment:', selectedEnv.id, selectedEnv.name)
+            console.log('DEBUG: Current chatLogs before API call:', chatLogs.map(c => ({ id: c.id, title: c.title })))
+            
             const response = await apiRequest(API_ENDPOINTS.sandbox.sessions(selectedEnv.id))
 
             if (!response.ok) {
@@ -54,7 +57,7 @@ const SandBoxChat = () => {
             }
 
             const sessions = await response.json()
-            console.log('Raw sessions from backend:', sessions) // Debug logging
+            console.log('DEBUG: Sessions returned from API:', sessions)
 
             if (sessions.length > 0) {
                 setChatLogs(sessions)
@@ -454,12 +457,24 @@ const SandBoxChat = () => {
             {!selectedEnv ? (
                 <SandboxManager
                     selectedEnvironment={selectedEnv}
-                    onEnvironmentSelect={(env) => setSelectedEnv(env)}
+                    onEnvironmentSelect={(env) => {
+                        // Clear previous state when switching environments
+                        setChatLogs([])
+                        setActiveChatId(null)
+                        setHasAsked(false)
+                        setSelectedEnv(env)
+                    }}
                 />
             ) : (
                 <div className={`HomePage ${hasAsked ? 'has-asked' : 'initial'}`}>
                     <button
-                        onClick={() => setSelectedEnv(null)}
+                        onClick={() => {
+                            // Clear state when going back to environments
+                            setChatLogs([])
+                            setActiveChatId(null)
+                            setHasAsked(false)
+                            setSelectedEnv(null)
+                        }}
                         className="btn btn-secondary"
                         style={{ marginBottom: '1rem' }}
                     >
