@@ -19,15 +19,15 @@
 }
 
 .sidebar-toggle:hover {
-    background-color: var(--color-accent, #10a37f);
-    border-color: var(--color-accent, #10a37f);
+    background-color: var(--color-accent, #f5a962);
+    border-color: var(--color-accent, #f5a962);
     transform: translateY(-1px);
     box-shadow: var(--shadow-large, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
 }
 
 .sidebar-toggle.open {
-    background-color: var(--color-accent, #10a37f);
-    border-color: var(--color-accent, #10a37f);
+    background-color: var(--color-accent, #f5a962);
+    border-color: var(--color-accent, #f5a962);
 }
 
 /* Mobile Overlay */
@@ -81,7 +81,7 @@
 
 .new-chat-btn {
     width: 100%;
-    background: linear-gradient(135deg, var(--color-accent, #10a37f), var(--color-accent-hover, #0e8c6f));
+    background: linear-gradient(135deg, var(--color-accent, #f5a962), var(--color-accent-hover, #e89850));
     color: var(--color-text-primary, #ffffff);
     border: none;
     padding: 0.875rem 1rem;
@@ -101,7 +101,7 @@
 .new-chat-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
-    background: linear-gradient(135deg, var(--color-accent-hover, #0e8c6f), #0a6a54);
+    background: linear-gradient(135deg, var(--color-accent-hover, #e89850), #d68640);
 }
 
 .new-chat-btn:active {
@@ -140,7 +140,7 @@
 }
 
 .mode-btn.active {
-    background-color: var(--color-accent, #10a37f);
+    background-color: var(--color-accent, #f5a962);
     color: var(--color-text-primary, #ffffff);
     box-shadow: 0 2px 4px rgba(16, 163, 127, 0.2);
 }
@@ -201,12 +201,12 @@
 
 .chat-item.active {
     background-color: var(--color-accent-light, rgba(16, 163, 127, 0.1));
-    border-color: var(--color-accent, #10a37f);
+    border-color: var(--color-accent, #f5a962);
     box-shadow: 0 0 0 1px rgba(16, 163, 127, 0.2);
 }
 
 .chat-item.active:hover {
-    background-color: rgba(16, 163, 127, 0.15);
+    background-color: rgba(245, 169, 98, 0.15);
 }
 
 /* Chat Content */
@@ -271,7 +271,7 @@
 .rename-input {
     width: 100%;
     background-color: var(--color-bg-secondary, #343541);
-    border: 1px solid var(--color-accent, #10a37f);
+    border: 1px solid var(--color-accent, #f5a962);
     color: var(--color-text-primary, #ffffff);
     padding: 0.5rem 0.75rem;
     border-radius: var(--border-radius-small, 8px);
@@ -282,7 +282,7 @@
 }
 
 .rename-input:focus {
-    box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+    box-shadow: 0 0 0 3px rgba(245, 169, 98, 0.15);
 }
 
 /* Sidebar Footer */

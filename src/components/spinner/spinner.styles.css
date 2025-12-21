@@ -2,10 +2,10 @@
   width: 10px;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: #0a6a54;
+  background: #d68640;
   box-shadow: 0 0 0 0 #0004;
   animation: l1 1s infinite;
 }
 @keyframes l1 {
-    100% {box-shadow: 0 0 0 10px #10a37f}
+    100% {box-shadow: 0 0 0 10px #f5a962}
 }

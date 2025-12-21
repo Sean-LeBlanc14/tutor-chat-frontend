@@ -2,7 +2,7 @@
 .environment-info-card {
     margin-bottom: 2rem;
     padding: 1.5rem;
-    background: linear-gradient(135deg, var(--color-bg-secondary, #343541) 0%, var(--color-bg-tertiary, #2d2d3a) 100%);
+    background: linear-gradient(135deg, var(--color-bg-secondary, #444654) 0%, #343541 100%);
     border: 1px solid var(--color-border, #565869);
     border-radius: var(--border-radius-large, 16px);
     box-shadow: var(--shadow, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
@@ -19,8 +19,8 @@
     font-size: 1.25rem;
     font-weight: 600;
     margin: 0 0 0.75rem 0;
-    color: var(--color-text-primary, #ffffff);
-    background: linear-gradient(135deg, var(--color-accent, #10a37f), #0e8c6f);
+    color: var(--color-text-primary, #ececf1);
+    background: linear-gradient(135deg, var(--color-accent, #f5a962), var(--color-accent-hover, #e89850));
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -42,10 +42,10 @@
     cursor: pointer;
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--color-accent, #10a37f);
+    color: var(--color-accent, #f5a962);
     padding: 0.75rem 1rem;
-    background-color: rgba(16, 163, 127, 0.1);
-    border: 1px solid rgba(16, 163, 127, 0.2);
+    background-color: var(--color-accent-light, rgba(245, 169, 98, 0.1));
+    border: 1px solid rgba(245, 169, 98, 0.2);
     border-radius: var(--border-radius, 12px);
     transition: var(--transition, all 0.2s ease);
     display: flex;
@@ -55,8 +55,8 @@
 }
 
 .environment-prompt-summary:hover {
-    background-color: rgba(16, 163, 127, 0.15);
-    border-color: rgba(16, 163, 127, 0.3);
+    background-color: rgba(245, 169, 98, 0.15);
+    border-color: rgba(245, 169, 98, 0.3);
     transform: translateY(-1px);
 }
 
@@ -73,13 +73,13 @@
 .environment-prompt-content {
     margin-top: 0.75rem;
     padding: 1.25rem;
-    background-color: var(--color-bg-primary, #444654);
+    background-color: var(--color-bg-secondary, #444654);
     border: 1px solid var(--color-border, #565869);
     border-radius: var(--border-radius, 12px);
     font-size: 0.9rem;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
     line-height: 1.6;
-    color: var(--color-text-primary, #ffffff);
+    color: var(--color-text-primary, #ececf1);
     white-space: pre-wrap;
     word-wrap: break-word;
     overflow-x: auto;
@@ -104,7 +104,7 @@
 }
 
 .environment-prompt-content::-webkit-scrollbar-track {
-    background: var(--color-bg-secondary, #343541);
+    background: var(--color-bg-secondary, #444654);
     border-radius: 3px;
 }
 

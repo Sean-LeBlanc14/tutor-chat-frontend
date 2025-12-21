@@ -15,7 +15,7 @@
     align-items: flex-end;
     gap: 0.75rem;
     padding: 1rem 1.25rem;
-    background-color: #ffffff;
+    background-color: #40414f;
     border-radius: 16px;
     border: 2px solid transparent;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -61,7 +61,7 @@
     outline: none;
     resize: none;
     background-color: transparent;
-    color: #1f2937;
+    color: #ececf1;
     line-height: 1.5;
     font-family: inherit;
     min-height: 24px;
@@ -72,7 +72,7 @@
 }
 
 .search-textarea::placeholder {
-    color: #6b7280;
+    color: #8e8ea0;
     font-style: italic;
 }
 
@@ -103,7 +103,7 @@
 
 /* Send Button */
 .search-send-button {
-    background: linear-gradient(135deg, #10a37f, #0e8c6f);
+    background: linear-gradient(135deg, #f5a962, #e89850);
     border: none;
     color: white;
     cursor: pointer;
@@ -134,7 +134,7 @@
 }
 
 .search-send-button:hover:not(.disabled) {
-    background: linear-gradient(135deg, #0e8c6f, #0a6a54);
+    background: linear-gradient(135deg, #e89850, #d68640);
     transform: translateY(-1px) scale(1.05);
     box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
 }
