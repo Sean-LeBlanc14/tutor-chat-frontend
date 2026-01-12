@@ -31,7 +31,7 @@
 }
 
 .sidebar-toggle.open:hover {
-    background-color: var(--color-accent-hover, #e89850);
+    background-color: var(--color-accent-hover, #ac6322);
     border-color: var(--color-accent-hover, #e89850);
     transform: translateY(-1px) scale(1.05);
 }
