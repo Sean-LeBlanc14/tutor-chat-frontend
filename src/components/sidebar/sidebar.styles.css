@@ -30,6 +30,12 @@
     border-color: var(--color-accent, #f5a962);
 }
 
+.sidebar-toggle.open:hover {
+    background-color: var(--color-accent-hover, #e89850);
+    border-color: var(--color-accent-hover, #e89850);
+    transform: translateY(-1px) scale(1.05);
+}
+
 /* Mobile Overlay */
 .sidebar-overlay {
     position: fixed;
