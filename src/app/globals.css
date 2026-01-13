@@ -67,9 +67,6 @@ body, html {
   overflow: hidden;
 }
 
-.HomePage.initial {
-  padding: 1rem;
-}
 
 .HomePage.has-asked {
   justify-content: flex-start;
