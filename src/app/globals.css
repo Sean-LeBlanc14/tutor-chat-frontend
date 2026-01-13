@@ -8,9 +8,9 @@
   --color-bg-user-bubble: #b55f0e;
   --color-border: #565869;
   --color-border-light: #4d4d57;
-  --color-accent: #f5a962;
-  --color-accent-hover: #e89850;
-  --color-accent-light: rgba(245, 169, 98, 0.1);
+  --color-accent: #b55f0e;
+  --color-accent-hover: #a05508;
+  --color-accent-light: rgba(181, 95, 14, 0.1);
   --color-text-primary: #ececf1;
   --color-text-secondary: #c5c5d2;
   --color-text-muted: #9ca3af;
@@ -204,7 +204,7 @@ body, html {
 }
 
 .chat-topbar-logout:hover {
-    background-color:  #f5a962;
+    background-color: var(--color-accent);
     transform: translateY(-1px);
     box-shadow: var(--shadow-large, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
 }
