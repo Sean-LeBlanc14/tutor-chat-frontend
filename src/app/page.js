@@ -512,7 +512,7 @@ const HomePage = () => {
       />
 
       <div className={`HomePage ${hasAsked ? "has-asked" : "initial"}`}>
-        {/* ✅ Top bar ALWAYS at top */}
+        {/* ✅ Sticky top bar */}
         <div className="chat-topbar">
           <div className="chat-topbar-left">
             <span className="chat-topbar-brand">Psych-Bot</span>
@@ -530,59 +530,54 @@ const HomePage = () => {
           </div>
         </div>
 
-        {/* ✅ Only this wrapper gets centered */}
-        <div className="homepage-content">
-          {chatLogs.length === 0 && chatsLoaded ? (
-            <div className="empty-state">
-              <h1>No Chats Yet</h1>
-              <p>Would you like to start a new chat?</p>
-            </div>
-          ) : (
-            !hasAsked && (
-              <>
-                <h1 className="home-title">Welcome to Tutor Chatbot</h1>
-                <p className="home-description">
-                  Ask a psychology question to get started.
-                </p>
-              </>
-            )
-          )}
+        {chatLogs.length === 0 && chatsLoaded ? (
+          <div className="empty-state">
+            <h1>No Chats Yet</h1>
+            <p>Would you like to start a new chat?</p>
+          </div>
+        ) : (
+          !hasAsked && (
+            <>
+              <h1 className="home-title">Welcome to Tutor Chatbot</h1>
+              <p className="home-description">
+                Ask a psychology question to get started.
+              </p>
+            </>
+          )
+        )}
 
-          {hasAsked && (
-            <div className="chat-history" ref={chatHistoryRef}>
-              {messages.map((msg, index) => {
-                const userQuestion =
-                  msg.role === "assistant" && index > 0
-                    ? messages[index - 1]?.content || ""
-                    : "";
-
-                return (
-                  <div key={msg.id || index} className="chat-line">
-                    <div className={`chat-bubble-wrapper ${msg.role}`}>
-                      <ChatMessage
-                        message={msg}
-                        originalQuestion={userQuestion}
-                        isStreaming={msg.id === streamingMessageId}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-
-              {loading && (
-                <div className="chat-line">
-                  <div className="chat-bubble-wrapper assistant">
-                    <div className="spinner-container">
-                      <Spinner />
-                    </div>
+        {hasAsked && (
+          <div className="chat-history" ref={chatHistoryRef}>
+            {messages.map((msg, index) => {
+              const userQuestion =
+                msg.role === "assistant" && index > 0
+                  ? messages[index - 1]?.content || ""
+                  : "";
+              return (
+                <div key={msg.id || index} className="chat-line">
+                  <div className={`chat-bubble-wrapper ${msg.role}`}>
+                    <ChatMessage
+                      message={msg}
+                      originalQuestion={userQuestion}
+                      isStreaming={msg.id === streamingMessageId}
+                    />
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+              );
+            })}
 
-        {/* ✅ Keep your SearchBox exactly how you had it */}
+            {loading && (
+              <div className="chat-line">
+                <div className="chat-bubble-wrapper assistant">
+                  <div className="spinner-container">
+                    <Spinner />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {chatLogs.length > 0 && (
           <div className={`chat-box-wrapper ${hasAsked ? "fixed-bottom" : ""}`}>
             <SearchBox

@@ -3,9 +3,9 @@ import { FiSend } from 'react-icons/fi'
 import './search-box.styles.css'
 
 const SearchBox = ({ value, onChange, onSubmit, className, placeholder = 'Enter a psychology question' }) => {
-    const textareaRef = useRef(null)
+  const textareaRef = useRef(null)
 
-    useEffect(() => {
+  useEffect(() => {
     const el = textareaRef.current
     if (!el) return
 
@@ -23,49 +23,49 @@ const SearchBox = ({ value, onChange, onSubmit, className, placeholder = 'Enter 
 
     // Scroll only after hitting the cap
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, [value])
+  }, [value])
 
-    const handleKeyDown = (event) => {
+  const handleKeyDown = (event) => {
     // Enter sends, Shift+Enter makes a newline (like ChatGPT)
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault()
-            onSubmit(event)
-        }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      onSubmit(event)
     }
+  }
 
-    const handleSubmit = (event) => {
-        event.preventDefault()
+  const handleSubmit = (event) => {
+    event.preventDefault()
     if (value.trim()) onSubmit(event)
-    }
+  }
 
-    return (
-        <div className={`search-box-container ${className || ''}`}>
-            <form onSubmit={handleSubmit} className='search-box-form'>
-                <div className='search-input-wrapper'>
-                    <textarea
-                        ref={textareaRef}
-                        value={value}
-                        onChange={onChange}
-                        onKeyDown={handleKeyDown}
-                        placeholder={placeholder}
-                        className='search-textarea'
-                        rows={1}
-                        disabled={false}
-                    />
-                    <div className='search-button-wrapper'>
-                        <button 
-                            type='submit' 
-                            className={`search-send-button ${!value.trim() ? 'disabled' : ''}`}
-                            disabled={!value.trim()}
-                            aria-label='Send message'
-                        >
-                            <FiSend size={18} />
-                        </button>
-                    </div>
-                </div>
-            </form>
+  return (
+    <div className={`search-box-container ${className || ''}`}>
+      <form onSubmit={handleSubmit} className='search-box-form'>
+        <div className='search-input-wrapper'>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={onChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className='search-textarea'
+            rows={1}
+          />
+
+          <div className='search-button-wrapper'>
+            <button
+              type='submit'
+              className={`search-send-button ${!value.trim() ? 'disabled' : ''}`}
+              disabled={!value.trim()}
+              aria-label='Send message'
+            >
+              <FiSend size={18} />
+            </button>
+          </div>
         </div>
-    )
+      </form>
+    </div>
+  )
 }
 
 export default SearchBox
