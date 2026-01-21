@@ -56,6 +56,7 @@ body, html {
   position: relative;
   flex: 1;
   display: flex;
+  min-height: 0;
   height: 100vh;
   flex-direction: column;
   justify-content: center;
@@ -83,6 +84,7 @@ body, html {
   width: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /*  Center only the welcome state, not the navbar */
@@ -157,6 +159,7 @@ body, html {
   overflow-y: auto;
   box-sizing: border-box;
   padding: 1rem 0;
+  min-height: 0;
 }
 
 .chat-history::-webkit-scrollbar {
