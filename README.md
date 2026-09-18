@@ -16,7 +16,7 @@ A responsive chat interface that connects students with an AI tutor trained on c
 
 | Category | Technologies |
 |---|---|
-| Framework | Next.js 14 (App Router), React 18 |
+| Framework | Next.js 16 (App Router), React 19 |
 | Language | JavaScript |
 | Styling | CSS Modules, CSS Variables |
 | State Management | React Context, Hooks (useState, useEffect, useCallback, useMemo) |
