@@ -4,6 +4,8 @@ A React/Next.js frontend for an AI-powered psychology tutoring platform built fo
 
 **Backend Repository:** [tutor-chat-backend](https://github.com/Sean-LeBlanc14/tutor-chat-backend)
 
+**Status:** Complete and no longer actively developed. Built during a research software engineering role at CSU Bakersfield (June–October 2025); the deployment has since been retired, so there is no live demo.
+
 ---
 
 ## Overview
